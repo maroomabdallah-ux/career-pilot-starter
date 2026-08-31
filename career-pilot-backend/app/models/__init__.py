@@ -6,3 +6,6 @@ from app.models.skill import Skill
 from app.models.user import User
 
 __all__ = ["CareerProfile", "Education", "Experience", "Project", "Skill", "User"]
+from app.models.auth_session import AuthSession
+
+__all__ = ["AuthSession", "CareerProfile", "Education", "Experience", "Project", "Skill", "User"]

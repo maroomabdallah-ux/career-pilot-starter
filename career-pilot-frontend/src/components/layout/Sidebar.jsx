@@ -18,24 +18,21 @@ import { NavLink } from "react-router-dom";
 import useAppStore from "../../store/useAppStore";
 
 const primary = [
-  ["Dashboard", "/", LayoutDashboard, true],
-  ["My Profile", "/profile", CircleUserRound],
-  ["Education", "/profile/education", GraduationCap],
-  ["Experience", "/profile/experience", BriefcaseBusiness],
-  ["Projects", "/profile/projects", FolderKanban],
-  ["Skills", "/profile/skills", Wrench],
+  ["Dashboard", "/app/dashboard", LayoutDashboard, true],
+  ["My Profile", "/app/profile", CircleUserRound],
 ];
 
 const careerTools = [
-  ["Resume Studio", "/resume", FileText],
-  ["Job Matches", "/jobs", Sparkles],
-  ["Applications", "/applications", BookOpen],
-  ["Interview Prep", "/interview", MessageSquareText],
+  ["Resume Studio", "/app/resume", FileText],
+  ["Job Matches", "/app/jobs", Sparkles],
+  ["Applications", "/app/applications", BookOpen],
+  ["Interview Prep", "/app/interview", MessageSquareText],
+  ["Career Roadmap", "/app/roadmap", FolderKanban],
 ];
 
 const secondary = [
-  ["Premium & Billing", "/billing", CreditCard],
-  ["Settings", "/settings", Settings],
+  ["Premium & Billing", "/app/billing", CreditCard],
+  ["Settings", "/app/settings", Settings],
   ["Help & Support", "/help", BadgeHelp],
 ];
 
@@ -63,13 +60,13 @@ export default function Sidebar() {
   return (
     <aside className={`sidebar navigation-rail ${open ? "is-open" : ""}`}>
       <div className="rail-top">
-        <NavLink className="rail-logo" to="/" aria-label="CareerPilot AI" onClick={close}>
+        <NavLink className="rail-logo" to="/app/dashboard" aria-label="CareerPilot AI" onClick={close}>
           <img src="/careerpilot-logo.png" alt="CareerPilot AI" />
         </NavLink>
         <button className="icon-button rail-close mobile-only" onClick={close} aria-label="Close navigation">
           <X size={18} />
         </button>
-        <NavLink className="rail-ai" to="/profile" aria-label="AI Assistant" onClick={close}>
+        <NavLink className="rail-ai" to="/app/profile" aria-label="Career profile" onClick={close}>
           <Sparkles size={18} strokeWidth={1.8} />
           <span className="rail-tooltip">AI Assistant</span>
         </NavLink>
@@ -84,7 +81,7 @@ export default function Sidebar() {
       <div className="rail-bottom">
         <div className="rail-divider" />
         {secondary.map((item) => <RailLink key={item[0]} item={item} onNavigate={close} />)}
-        <NavLink className="rail-avatar" to="/profile" aria-label="User profile" onClick={close}>
+        <NavLink className="rail-avatar" to="/app/settings" aria-label="User settings" onClick={close}>
           CP<span className="rail-tooltip">Your profile</span>
         </NavLink>
       </div>

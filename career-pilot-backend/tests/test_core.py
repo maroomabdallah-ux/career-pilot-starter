@@ -28,6 +28,7 @@ from app.services.user import UserService
 def test_models_and_relationships_configure():
     configure_mappers()
     assert set(Base.metadata.tables) == {
+        "auth_sessions",
         "users",
         "career_profiles",
         "education",
@@ -92,11 +93,11 @@ async def test_duplicate_skill_rejected():
 
 def test_openapi_and_http_error_contracts():
     client = TestClient(app)
-    assert client.post("/api/v1/users", json={}).status_code == 422
+    assert client.post("/api/v1/auth/signup", json={}).status_code == 422
     missing_id = uuid4()
-    # A malformed UUID is rejected before a database dependency is consumed.
-    assert client.get("/api/v1/users/not-a-uuid").status_code == 422
+    assert client.get("/api/v1/auth/me").status_code == 401
     paths = app.openapi()["paths"]
-    assert "/api/v1/users" in paths
-    assert "/api/v1/career-profiles/{profile_id}/skills" in paths
+    assert "/api/v1/auth/signup" in paths
+    assert "/api/v1/me/skills" in paths
+    assert "/api/v1/users" not in paths
     assert missing_id

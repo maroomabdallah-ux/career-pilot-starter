@@ -13,6 +13,7 @@ class EducationBase(DateRangeMixin):
     end_date: date | None = None
     is_current: bool = False
     grade: str | None = None
+    grade_system: str | None = Field(default=None, max_length=50)
     description: str | None = None
 
 
@@ -29,6 +30,7 @@ class EducationUpdate(DateRangeMixin):
     end_date: date | None = None
     is_current: bool | None = None
     grade: str | None = None
+    grade_system: str | None = Field(default=None, max_length=50)
     description: str | None = None
 
 

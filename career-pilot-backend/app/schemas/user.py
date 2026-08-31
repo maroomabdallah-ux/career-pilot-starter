@@ -23,4 +23,4 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase, ORMResponse):
-    pass
+    onboarding_completed: bool

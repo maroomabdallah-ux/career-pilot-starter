@@ -7,6 +7,13 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     CORS_ORIGINS: list[str] = ["http://localhost:5173"]
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/career_pilot"
+    JWT_SECRET_KEY: str = "development-only-change-me-at-least-32-bytes"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 14
+    FRONTEND_URL: str = "http://localhost:5173"
+    REFRESH_COOKIE_NAME: str = "careerpilot_refresh"
+    ENABLE_LEGACY_CRUD_ROUTES: bool = False
     OPENAI_API_KEY: str | None = None
     MCP_CORE_SERVER_URL: str = "http://localhost:8001/mcp"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")

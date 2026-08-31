@@ -48,3 +48,23 @@ class SkillNotFoundError(NotFoundError):
 
 class DuplicateSkillError(ConflictError):
     detail = "This skill already exists on the profile"
+
+
+class AuthenticationError(ApplicationError):
+    detail = "Authentication required"
+
+
+class InvalidCredentialsError(AuthenticationError):
+    detail = "Invalid email or password"
+
+
+class SessionExpiredError(AuthenticationError):
+    detail = "Session expired"
+
+
+class SessionRevokedError(AuthenticationError):
+    detail = "Session has been revoked"
+
+
+class ProfileAccessDeniedError(ApplicationError):
+    detail = "You do not have access to this profile resource"

@@ -1,0 +1,2 @@
+import { Check } from "lucide-react";
+export default function JourneyProgress({steps,current}){return <nav className="launch-journey" aria-label="Onboarding progress">{steps.map((step,index)=><div className={`${index<current?"done":""} ${index===current?"current":""}`} key={step}><span>{index<current?<Check size={13}/>:String(index+1).padStart(2,"0")}</span><small>{step}</small>{index<steps.length-1&&<i/>}</div>)}</nav>}

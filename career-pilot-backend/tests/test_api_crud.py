@@ -6,7 +6,8 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 pytestmark = pytest.mark.skipif(
-    not os.getenv("RUN_DATABASE_TESTS"), reason="requires a migrated PostgreSQL test database"
+    not (os.getenv("RUN_DATABASE_TESTS") and os.getenv("ENABLE_LEGACY_CRUD_ROUTES")),
+    reason="requires a migrated database and explicitly enabled legacy routes",
 )
 
 
