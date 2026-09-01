@@ -35,8 +35,9 @@ def test_models_and_relationships_configure():
             "career_knowledge_chunks",
             "education",
         "experiences",
-        "projects",
-        "skills",
+            "projects",
+            "resumes",
+            "skills",
     }
     profile = Base.metadata.tables["career_profiles"]
     assert profile.c.user_id.unique

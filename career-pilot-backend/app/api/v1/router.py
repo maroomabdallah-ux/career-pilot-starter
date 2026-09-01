@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     experiences,
     me,
     projects,
+    resumes,
     profile_agent,
     reference,
     skills,
@@ -21,6 +22,7 @@ api_router.include_router(me.router, prefix="/me", tags=["current user"])
 api_router.include_router(reference.router, prefix="/reference", tags=["reference data"])
 api_router.include_router(system.router, prefix="/system", tags=["system"])
 api_router.include_router(profile_agent.router, prefix="/ai/profile", tags=["profile agent"])
+api_router.include_router(resumes.router, prefix="/resumes", tags=["resumes"])
 if settings.ENABLE_LEGACY_CRUD_ROUTES:
     api_router.include_router(users.router, prefix="/users", tags=["legacy development"])
     api_router.include_router(

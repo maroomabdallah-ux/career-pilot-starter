@@ -10,3 +10,4 @@ from app.models.auth_session import AuthSession
 
 __all__ = ["AuthSession", "CareerProfile", "Education", "Experience", "Project", "Skill", "User"]
 from app.models.career_knowledge import CareerKnowledgeChunk, CareerKnowledgeDocument
+from app.models.resume import Resume
