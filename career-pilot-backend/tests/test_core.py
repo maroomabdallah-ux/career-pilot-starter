@@ -30,8 +30,10 @@ def test_models_and_relationships_configure():
     assert set(Base.metadata.tables) == {
         "auth_sessions",
         "users",
-        "career_profiles",
-        "education",
+            "career_profiles",
+            "career_knowledge_documents",
+            "career_knowledge_chunks",
+            "education",
         "experiences",
         "projects",
         "skills",

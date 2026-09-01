@@ -27,6 +27,7 @@ class CareerProfile(UUIDTimestampMixin, Base):
     )
     professional_title: Mapped[str | None] = mapped_column(String(200))
     professional_summary: Mapped[str | None] = mapped_column(Text)
+    profile_picture: Mapped[str | None] = mapped_column(Text)
     phone: Mapped[str | None] = mapped_column(String(50))
     city: Mapped[str | None] = mapped_column(String(100))
     country: Mapped[str | None] = mapped_column(String(100))

@@ -2,6 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import useAppStore from "../../store/useAppStore";
+import ProfileAgentDrawer from "../career/ProfileAgentDrawer";
 
 export default function AppShell() {
   const location = useLocation();
@@ -16,6 +17,7 @@ export default function AppShell() {
         <div className="page-transition" key={location.pathname}>
           <Outlet />
         </div>
+        <ProfileAgentDrawer />
       </div>
     </div>
   );

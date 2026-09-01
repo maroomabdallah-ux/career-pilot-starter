@@ -19,8 +19,7 @@ async def universities(
             status_code=503,
             content={
                 "detail": (
-                    "University search is temporarily unavailable. "
-                    "Manual entry is still available."
+                    "University search is temporarily unavailable. Manual entry is still available."
                 )
             },
         )

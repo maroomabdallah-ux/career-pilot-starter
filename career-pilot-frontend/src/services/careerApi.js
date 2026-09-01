@@ -10,6 +10,8 @@ export const careerApi = {
   createChild: (resource, payload) => data(apiClient.post(`/me/${resource}`, payload)),
   updateChild: (resource, id, payload) => data(apiClient.patch(`/me/${resource}/${id}`, payload)),
   deleteChild: (resource, id) => apiClient.delete(`/me/${resource}/${id}`),
+  profileAgentChat: (payload) => data(apiClient.post("/ai/profile/chat", payload)),
+  profileAgentApprove: (payload) => data(apiClient.post("/ai/profile/approve", payload)),
 };
 
 export function apiErrorMessage(error) {

@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     REFRESH_COOKIE_NAME: str = "careerpilot_refresh"
     ENABLE_LEGACY_CRUD_ROUTES: bool = False
     OPENAI_API_KEY: str | None = None
+    PROFILE_AGENT_MODEL: str = "gpt-4.1-mini"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     MCP_CORE_SERVER_URL: str = "http://localhost:8001/mcp"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

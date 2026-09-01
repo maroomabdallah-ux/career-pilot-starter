@@ -7,7 +7,8 @@ export const profileCompletionConfig = {
   skills: 20,
 };
 
-const completeEducation = (x) => x?.institution && x?.degree && x?.field_of_study && x?.start_date;
+const completeEducation = (x) =>
+  x?.institution && x?.degree && x?.field_of_study && x?.start_date;
 const completeExperience = (x) => x?.company && x?.job_title && x?.start_date;
 const completeProject = (x) => x?.name && x?.description;
 
@@ -21,15 +22,42 @@ export function calculateProfileCompletion(profile) {
     projects: Boolean(p.projects?.some(completeProject)),
     skills: (p.skills?.length || 0) >= 3,
   };
-  const score = Object.entries(categories).reduce((total,[key,done]) => total + (done ? profileCompletionConfig[key] : 0), 0);
+  const score = Object.entries(categories).reduce(
+    (total, [key, done]) => total + (done ? profileCompletionConfig[key] : 0),
+    0,
+  );
   const actions = [
-    [!categories.personal,"Complete your professional basics","/app/profile"],
-    [!categories.goals,"Add your career goals and work preferences","/app/profile"],
-    [!categories.education,"Complete your education details","/app/profile/education"],
-    [!categories.experience,"Add your latest professional experience","/app/profile/experience"],
-    [!categories.projects,"Showcase your strongest project","/app/profile/projects"],
-    [!categories.skills,`Add ${Math.max(1,3-(p.skills?.length||0))} more core skills`,"/app/profile/skills"],
+    [!categories.personal, "Complete your professional basics", "/app/profile"],
+    [
+      !categories.goals,
+      "Add your career goals and work preferences",
+      "/app/profile/direction",
+    ],
+    [
+      !categories.education,
+      "Complete your education details",
+      "/app/profile/education",
+    ],
+    [
+      !categories.experience,
+      "Add your latest professional experience",
+      "/app/profile/experience",
+    ],
+    [
+      !categories.projects,
+      "Showcase your strongest project",
+      "/app/profile/projects",
+    ],
+    [
+      !categories.skills,
+      `Add ${Math.max(1, 3 - (p.skills?.length || 0))} more core skills`,
+      "/app/profile/skills",
+    ],
   ];
-  const next = actions.find(([needed]) => needed) || [false,"Review your career profile","/app/profile"];
+  const next = actions.find(([needed]) => needed) || [
+    false,
+    "Let's build your resume",
+    "/app/resume",
+  ];
   return { score, categories, nextAction: { label: next[1], to: next[2] } };
 }
