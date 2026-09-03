@@ -29,4 +29,4 @@ def test_skill_groups_cannot_add_unsaved_skills():
     result = merge_writing(
         base, ResumeWriting(skill_groups={"Backend": ["Python", "Kubernetes"]}), "skills"
     )
-    assert result["skill_groups"] == {"Backend": ["Python"]}
+    assert result["skill_groups"] == [{"category": "Backend", "items": ["Python"], "visible": True}]

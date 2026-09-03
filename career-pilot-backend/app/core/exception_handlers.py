@@ -1,12 +1,48 @@
+import logging
+
 from fastapi import FastAPI, Request, status
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from app.core.config import settings
 from app.core.exceptions import (
     AuthenticationError,
     ConflictError,
     NotFoundError,
     ProfileAccessDeniedError,
 )
+
+logger = logging.getLogger(__name__)
+
+
+async def request_validation_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    if settings.ENVIRONMENT == "development":
+        # Do not log input values: validation payloads may contain private profile data.
+        errors = [
+            {
+                "location": [str(part) for part in error["loc"]],
+                "type": error["type"],
+                "message": error["msg"],
+            }
+            for error in exc.errors()
+        ]
+        logger.warning(
+            "API request validation failed",
+            extra={
+                "validation": {
+                    "method": request.method,
+                    "path": request.url.path,
+                    "errors": errors,
+                }
+            },
+        )
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder({"detail": exc.errors()}),
+    )
 
 
 async def not_found_handler(_: Request, exc: NotFoundError) -> JSONResponse:
@@ -18,6 +54,7 @@ async def conflict_handler(_: Request, exc: ConflictError) -> JSONResponse:
 
 
 def register_exception_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(NotFoundError, not_found_handler)
     app.add_exception_handler(ConflictError, conflict_handler)
     app.add_exception_handler(

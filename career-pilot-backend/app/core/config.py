@@ -16,8 +16,12 @@ class Settings(BaseSettings):
     ENABLE_LEGACY_CRUD_ROUTES: bool = False
     OPENAI_API_KEY: str | None = None
     PROFILE_AGENT_MODEL: str = "gpt-4.1-mini"
+    RESUME_AGENT_MODEL: str = "gpt-4.1-mini"
     OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
     MCP_CORE_SERVER_URL: str = "http://localhost:8001/mcp"
+    MCP_AUTH_ISSUER_URL: str = "http://localhost:8000"
+    MCP_HOST: str = "127.0.0.1"
+    MCP_PORT: int = 8001
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

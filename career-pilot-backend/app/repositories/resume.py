@@ -1,6 +1,8 @@
 from uuid import UUID
-from sqlalchemy import select
+
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.models.resume import Resume
 
 
@@ -10,12 +12,10 @@ class ResumeRepository:
 
     async def list_for_user(self, user_id: UUID):
         return list(
-            (
-                await self.session.scalars(
-                    select(Resume)
-                    .where(Resume.user_id == user_id)
-                    .order_by(Resume.updated_at.desc())
-                )
+            await self.session.scalars(
+                select(Resume)
+                .where(Resume.user_id == user_id)
+                .order_by(Resume.updated_at.desc())
             )
         )
 
@@ -29,6 +29,12 @@ class ResumeRepository:
         await self.session.commit()
         await self.session.refresh(resume)
         return resume
+
+    async def next_version(self, user_id: UUID) -> int:
+        current = await self.session.scalar(
+            select(func.max(Resume.version)).where(Resume.user_id == user_id)
+        )
+        return (current or 0) + 1
 
     async def save(self, resume: Resume):
         await self.session.commit()

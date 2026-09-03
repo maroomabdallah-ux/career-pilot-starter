@@ -1,13 +1,6 @@
-from mcp.server.fastmcp import FastMCP
+"""Backward-compatible import path for the single CareerPilot MCP server."""
 
-mcp = FastMCP("CareerPilot Core Tools")
-
-
-@mcp.tool()
-def ping() -> str:
-    """Simple starter MCP tool."""
-    return "CareerPilot MCP server is ready."
-
+from app.mcp.server import mcp
 
 if __name__ == "__main__":
-    mcp.run(transport="http")
+    mcp.run(transport="streamable-http")

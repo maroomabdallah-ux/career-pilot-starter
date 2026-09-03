@@ -1,4 +1,5 @@
 from uuid import UUID
+
 from app.models.resume import Resume
 from app.repositories.resume import ResumeRepository
 
@@ -17,14 +18,34 @@ class ResumeService:
             raise ValueError("Resume not found")
         return item
 
-    async def create(self, title, language, content):
+    async def create(self, title, language, content, template_id="ats_classic"):
+        from app.services.resume_templates import get_template
+
+        template_id = get_template(template_id)["id"]
         return await self.repository.create(
-            Resume(user_id=self.user_id, title=title, language=language, content=content)
+            Resume(
+                user_id=self.user_id,
+                title=title,
+                language=language,
+                content=content,
+                template_id=template_id,
+                version=await self.repository.next_version(self.user_id),
+            )
         )
 
     async def update(self, resume_id, data):
         item = await self.get(resume_id)
+        if item.status == "approved":
+            raise ValueError(
+                "Approved resumes are immutable. Create a new version to make changes."
+            )
         for key, value in data.model_dump(exclude_unset=True).items():
+            if key == "template_id":
+                from app.services.resume_templates import get_template
+
+                value = get_template(value)["id"]
+            if key == "content" and hasattr(value, "model_dump"):
+                value = value.model_dump(mode="json")
             setattr(item, key, value)
         return await self.repository.save(item)
 

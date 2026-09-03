@@ -6,18 +6,19 @@ import ProfileAgentDrawer from "../career/ProfileAgentDrawer";
 
 export default function AppShell() {
   const location = useLocation();
+  const resumeEditor = /^\/app\/resume\/[^/]+\/edit$/.test(location.pathname);
   const open = useAppStore((state) => state.sidebarOpen);
   const setOpen = useAppStore((state) => state.setSidebarOpen);
   return (
-    <div className="app-shell">
-      <Sidebar />
+    <div className={`app-shell ${resumeEditor ? "resume-editor-app" : ""}`}>
+      {!resumeEditor && <Sidebar />}
       {open && <button className="sidebar-scrim" aria-label="Close menu" onClick={() => setOpen(false)} />}
       <div className="workspace">
-        <Topbar />
+        {!resumeEditor && <Topbar />}
         <div className="page-transition" key={location.pathname}>
           <Outlet />
         </div>
-        <ProfileAgentDrawer />
+        {!resumeEditor && <ProfileAgentDrawer />}
       </div>
     </div>
   );
