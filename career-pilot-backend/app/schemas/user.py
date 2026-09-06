@@ -24,3 +24,4 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase, ORMResponse):
     onboarding_completed: bool
+    is_admin: bool

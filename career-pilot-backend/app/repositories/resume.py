@@ -13,9 +13,7 @@ class ResumeRepository:
     async def list_for_user(self, user_id: UUID):
         return list(
             await self.session.scalars(
-                select(Resume)
-                .where(Resume.user_id == user_id)
-                .order_by(Resume.updated_at.desc())
+                select(Resume).where(Resume.user_id == user_id).order_by(Resume.updated_at.desc())
             )
         )
 

@@ -1,17 +1,20 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    admin_usage,
     auth,
     career_profiles,
     education,
     experiences,
+    jobs,
     me,
-    projects,
-    resumes,
     profile_agent,
+    projects,
     reference,
+    resumes,
     skills,
     system,
+    usage,
     users,
 )
 from app.core.config import settings
@@ -23,6 +26,9 @@ api_router.include_router(reference.router, prefix="/reference", tags=["referenc
 api_router.include_router(system.router, prefix="/system", tags=["system"])
 api_router.include_router(profile_agent.router, prefix="/ai/profile", tags=["profile agent"])
 api_router.include_router(resumes.router, prefix="/resumes", tags=["resumes"])
+api_router.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+api_router.include_router(usage.router, prefix="/usage", tags=["AI usage"])
+api_router.include_router(admin_usage.router, prefix="/admin/usage", tags=["admin AI usage"])
 if settings.ENABLE_LEGACY_CRUD_ROUTES:
     api_router.include_router(users.router, prefix="/users", tags=["legacy development"])
     api_router.include_router(

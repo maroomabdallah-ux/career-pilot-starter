@@ -16,9 +16,7 @@ from app.core.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-async def request_validation_handler(
-    request: Request, exc: RequestValidationError
-) -> JSONResponse:
+async def request_validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     if settings.ENVIRONMENT == "development":
         # Do not log input values: validation payloads may contain private profile data.
         errors = [

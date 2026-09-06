@@ -20,3 +20,4 @@ class Resume(UUIDTimestampMixin, Base):
     template_id: Mapped[str] = mapped_column(String(64), default="ats_classic")
     language: Mapped[str] = mapped_column(String(8), default="en")
     content: Mapped[dict] = mapped_column(JSONB, default=dict)
+    design: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")

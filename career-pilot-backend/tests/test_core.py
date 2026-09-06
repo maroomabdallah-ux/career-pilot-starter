@@ -29,14 +29,17 @@ def test_models_and_relationships_configure():
     configure_mappers()
     assert set(Base.metadata.tables) == {
         "auth_sessions",
+        "ai_usage",
         "users",
             "career_profiles",
             "career_knowledge_documents",
             "career_knowledge_chunks",
             "education",
         "experiences",
+        "job_search_history",
             "projects",
-            "resumes",
+        "resumes",
+        "saved_jobs",
             "skills",
     }
     profile = Base.metadata.tables["career_profiles"]

@@ -4,8 +4,8 @@ from copy import deepcopy
 from functools import lru_cache
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 
+from app.ai.factory import create_chat_model
 from app.core.config import settings
 from app.schemas.resume import ResumeFactValidation, ResumeWriting
 
@@ -61,12 +61,12 @@ VALIDATION_PROMPT = ChatPromptTemplate.from_messages(
 
 
 @lru_cache(maxsize=1)
-def get_resume_llm() -> ChatOpenAI:
+def get_resume_llm():
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY is required for resume generation.")
-    return ChatOpenAI(
+    return create_chat_model(
+        agent_name="resume_agent",
         model=settings.RESUME_AGENT_MODEL,
-        api_key=settings.OPENAI_API_KEY,
         temperature=0,
     )
 
@@ -147,6 +147,7 @@ class ResumeWritingService:
                 "rag": json.dumps(rag or []),
             }
         )
+
         # Resume fields are structured data, not Markdown documents. Models can
         # still emit headings/bold/list markers when RAG contains Markdown, so
         # normalize presentation syntax before fact validation and rendering.
@@ -162,7 +163,9 @@ class ResumeWritingService:
         cleaned = result.model_dump()
         cleaned["summary"] = clean(cleaned.get("summary"))
         for experience in cleaned.get("experience", []):
-            experience["bullets"] = [clean(bullet) for bullet in experience["bullets"] if clean(bullet)]
+            experience["bullets"] = [
+                clean(bullet) for bullet in experience["bullets"] if clean(bullet)
+            ]
         for project in cleaned.get("projects", []):
             project["description"] = clean(project.get("description"))
         result = ResumeWriting.model_validate(cleaned)

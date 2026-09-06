@@ -29,9 +29,23 @@ export const careerApi = {
   regenerateResumeSection: (id, section) =>
     data(apiClient.post(`/resumes/${id}/regenerate-section`, { section })),
   analyzeResume: (id) => data(apiClient.get(`/resumes/${id}/analysis`)),
-  coachResume: (id, payload) => data(apiClient.post(`/resumes/${id}/copilot`, payload)),
-  applyResumeSuggestion: (id, payload) => data(apiClient.post(`/resumes/${id}/suggestions/apply`, payload)),
-  exportResume: (id) => apiClient.post(`/resumes/${id}/export`, null, { responseType: "blob" }),
+  coachResume: (id, payload) =>
+    data(apiClient.post(`/resumes/${id}/copilot`, payload)),
+  applyResumeSuggestion: (id, payload) =>
+    data(apiClient.post(`/resumes/${id}/suggestions/apply`, payload)),
+  exportResume: (id) =>
+    apiClient.post(`/resumes/${id}/export`, null, { responseType: "blob" }),
+  searchJobs: (payload) => data(apiClient.post("/jobs/search", payload)),
+  listSavedJobs: () => data(apiClient.get("/jobs/saved")),
+  saveJob: (job) => data(apiClient.post("/jobs/saved", { job })),
+  unsaveJob: (id) => apiClient.delete(`/jobs/saved/${id}`),
+  getJobSearchHistory: () => data(apiClient.get("/jobs/search-history")),
+  getAIUsageSummary: (params) =>
+    data(apiClient.get("/admin/usage/summary", { params })),
+  getAIUsageDaily: (params) =>
+    data(apiClient.get("/admin/usage/daily", { params })),
+  getAIUsageBreakdown: (group, params) =>
+    data(apiClient.get(`/admin/usage/by-${group}`, { params })),
 };
 
 export function apiErrorMessage(error) {
@@ -39,7 +53,8 @@ export function apiErrorMessage(error) {
     return "CareerPilot could not reach the API. Make sure the backend is running on port 8000.";
   }
   const detail = error?.response?.data?.detail;
-  if (error?.response?.data?.error?.message) return error.response.data.error.message;
+  if (error?.response?.data?.error?.message)
+    return error.response.data.error.message;
   if (Array.isArray(detail)) return detail[0]?.msg || "Please review the form.";
   if (detail?.error?.message) return detail.error.message;
   if (detail?.message) return detail.message;

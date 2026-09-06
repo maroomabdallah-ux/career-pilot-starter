@@ -69,6 +69,7 @@ class ProjectOutput(MCPModel):
     repository_url: str | None = None
     start_date: date | None = None
     end_date: date | None = None
+    is_current: bool = False
 
 
 class CareerKnowledgeOutput(MCPModel):
@@ -93,6 +94,15 @@ class ResumeSummaryOutput(MCPModel):
 
 class ResumeOutput(ResumeSummaryOutput):
     content: dict[str, Any]
+    design: dict[str, Any] = Field(default_factory=dict)
+
+
+class WriteResult(BaseModel):
+    success: bool = True
+    operation: str
+    resource: str
+    label: str
+    item: dict[str, Any] | None = None
 
 
 def json_output(value: BaseModel | list[BaseModel]) -> dict | list[dict]:

@@ -38,7 +38,7 @@ class CareerPilotTokenVerifier:
 def create_mcp_server() -> FastMCP:
     server = FastMCP(
         "CareerPilot Core Tools",
-        instructions="Authenticated, user-scoped, read-only CareerPilot business tools.",
+        instructions="Authenticated, user-scoped CareerPilot business tools.",
         token_verifier=CareerPilotTokenVerifier(),
         auth=AuthSettings(
             issuer_url=settings.MCP_AUTH_ISSUER_URL,

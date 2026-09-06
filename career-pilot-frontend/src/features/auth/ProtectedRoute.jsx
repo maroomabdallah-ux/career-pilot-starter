@@ -4,10 +4,23 @@ import { useAuthStore } from "./auth.store";
 export function ProtectedRoute() {
   const status = useAuthStore((state) => state.status);
   const location = useLocation();
-  return status === "authenticated" ? <Outlet/> : <Navigate to="/login" replace state={{ from: location.pathname }}/>;
+  return status === "authenticated" ? (
+    <Outlet />
+  ) : (
+    <Navigate to="/login" replace state={{ from: location.pathname }} />
+  );
 }
 
 export function OnboardingGuard() {
   const user = useAuthStore((state) => state.user);
-  return user?.onboarding_completed ? <Outlet/> : <Navigate to="/onboarding" replace/>;
+  return user?.onboarding_completed || user?.is_admin ? (
+    <Outlet />
+  ) : (
+    <Navigate to="/onboarding" replace />
+  );
+}
+
+export function AdminRoute() {
+  const user = useAuthStore((state) => state.user);
+  return user?.is_admin ? <Outlet /> : <Navigate to="/app/dashboard" replace />;
 }

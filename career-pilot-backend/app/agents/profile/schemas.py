@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field
+
 
 class ProfileIntent(StrEnum):
     GREETING = "greeting"
@@ -18,6 +20,7 @@ class ProfileIntent(StrEnum):
     UPDATE_EDUCATION = "update_education"
     DELETE_EDUCATION = "delete_education"
     ADD_SKILL = "add_skill"
+    UPDATE_SKILL = "update_skill"
     DELETE_SKILL = "delete_skill"
     ADD_EXPERIENCE = "add_experience"
     UPDATE_EXPERIENCE = "update_experience"
@@ -32,6 +35,7 @@ class ProfileIntent(StrEnum):
     GENERAL_PROFILE_QUESTION = "general_profile_question"
     UNKNOWN = "unknown"
 
+
 class IntentResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
     intent: ProfileIntent
@@ -43,18 +47,23 @@ class IntentResult(BaseModel):
     missing_required_fields: list[str] = Field(default_factory=list)
     ambiguities: list[str] = Field(default_factory=list)
 
+
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     thread_id: str | None = Field(default=None, min_length=1, max_length=128)
 
+
 class ApprovalRequest(BaseModel):
     thread_id: str = Field(min_length=1, max_length=128)
-    decision: str = Field(pattern="^(approve|reject)$")
+    decision: str = Field(pattern="^(approve|reject|edit)$")
+    edited_fields: dict[str, Any] | None = None
+
 
 class Proposal(BaseModel):
     operation: str
     domain: str
     fields: dict[str, Any]
+
 
 class AgentResponse(BaseModel):
     type: str

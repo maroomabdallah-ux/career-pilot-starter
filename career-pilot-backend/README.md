@@ -6,7 +6,7 @@ Auth endpoints are under `/api/v1/auth`; JWT-owned career data endpoints are und
 
 ## MCP foundation
 
-CareerPilot exposes one read-only MCP server using MCP 1.29's stateless Streamable HTTP transport. Start it separately from FastAPI:
+CareerPilot exposes one MCP server using MCP 1.29's stateless Streamable HTTP transport. Start it separately from FastAPI:
 
 ```bash
 cd career-pilot-backend
@@ -15,7 +15,9 @@ cd career-pilot-backend
 
 The endpoint is `http://127.0.0.1:8001/mcp`. A caller creates a request-scoped MCP client with the current CareerPilot access token via `build_mcp_client(access_token)`. FastMCP validates that bearer JWT, places its subject in authenticated MCP request context, and every tool re-resolves that subject to an active user in a fresh database session. Tools then call existing user-scoped services; model-generated arguments never contain ownership identity.
 
-The initial tools are read-only: `get_my_profile`, `get_my_skills`, `get_my_experience`, `get_my_education`, `get_my_projects`, `search_my_career_knowledge`, `list_my_resumes`, and `get_my_resume`. Human approval remains outside MCP and no existing Agent uses MCP yet.
+Read tools are `get_my_profile`, `get_my_skills`, `get_my_experience`, `get_my_education`, `get_my_projects`, `search_my_career_knowledge`, `list_my_resumes`, and `get_my_resume`.
+
+Approved Profile writes use `update_my_profile` plus add/update/delete tools for skills, experience, education, and projects. The Profile Agent resolves human-readable targets through MCP reads, creates a LangGraph proposal, and invokes a write tool only after explicit approval. The Resume Agent also obtains its Profile and RAG context through the same centralized MCP client.
 
 Run the focused foundation tests with:
 

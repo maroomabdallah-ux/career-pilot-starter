@@ -103,7 +103,9 @@ async def quality_validation(state: ResumeState):
     smart_flags = []
     for item in report.analyses:
         if item.quality in {"insufficient_information", "weak", "needs_improvement"}:
-            label = item.section.title() + (f" {item.item_index + 1}" if item.item_index is not None else "")
+            label = item.section.title() + (
+                f" {item.item_index + 1}" if item.item_index is not None else ""
+            )
             detail = item.issues[0].message if item.issues else item.missing_information[0]
             smart_flags.append(f"{label}: {detail}")
     content["review_flags"] = (quality_issues(content) + smart_flags)[:3]
@@ -158,8 +160,22 @@ async def understand_resume_request(state: ResumeCopilotState):
 
 async def evaluate_information_quality(state: ResumeCopilotState):
     selected = state["selection"]
-    analysis = analyze_section(state["content"], state["verified"], selected["section"], selected.get("item_index"), state.get("rag", []), state.get("language", "en"))
-    return {"analysis": analysis, "relevant_context": [s.suggestion for s in analysis.supported_suggestions if s.type == "add_existing_fact" and s.suggestion]}
+    analysis = analyze_section(
+        state["content"],
+        state["verified"],
+        selected["section"],
+        selected.get("item_index"),
+        state.get("rag", []),
+        state.get("language", "en"),
+    )
+    return {
+        "analysis": analysis,
+        "relevant_context": [
+            s.suggestion
+            for s in analysis.supported_suggestions
+            if s.type == "add_existing_fact" and s.suggestion
+        ],
+    }
 
 
 def build_resume_copilot_graph():

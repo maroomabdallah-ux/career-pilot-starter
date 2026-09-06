@@ -38,6 +38,14 @@ const sectionNames = {
   projects: "Projects",
   skills: "Skills",
 };
+const defaultDesign = {
+  accent: "#1769d2",
+  font: "professional",
+  textSize: 100,
+  lineSpacing: 1.45,
+  sectionSpacing: 16,
+  pageMargins: 16,
+};
 
 export default function ResumePage() {
   const { resumeId } = useParams();
@@ -62,13 +70,14 @@ export default function ResumePage() {
       "careerpilot_classic",
   );
   const [design, setDesign] = useState({
-    accent: localStorage.getItem("careerpilot_resume_accent") || "#1769d2",
-    font: "professional",
-    textSize: 100,
-    lineSpacing: 1.45,
-    sectionSpacing: 16,
-    pageMargins: 16,
+    ...defaultDesign,
+    accent:
+      localStorage.getItem("careerpilot_resume_accent") || defaultDesign.accent,
   });
+  const changeDesign = (next) => {
+    setDesign(next);
+    setSaveState("unsaved");
+  };
   useEffect(() => {
     localStorage.setItem("careerpilot_resume_accent", design.accent);
   }, [design.accent]);
@@ -94,6 +103,7 @@ export default function ResumePage() {
     if (selected) {
       setSelectedId(selected.id);
       setDraft(clone(selected.content));
+      setDesign({ ...defaultDesign, ...(selected.design || {}) });
       setResumeTitle(selected.title);
       setPdfFilename(`${selected.title.replace(/[^a-z0-9]+/gi, "_")}.pdf`);
       setSaveState("saved");
@@ -126,6 +136,7 @@ export default function ResumePage() {
       careerApi.updateResume(selected.id, {
         content: draft,
         title: resumeTitle.trim(),
+        design,
       }),
     onMutate: () => setSaveState("saving"),
     onSuccess: async () => {
@@ -140,10 +151,18 @@ export default function ResumePage() {
     onSuccess: refresh,
   });
   const approve = useMutation({
-    mutationFn: (id) =>
-      selected.status === "draft"
+    mutationFn: async (id) => {
+      if (saveState !== "saved") {
+        await careerApi.updateResume(id, {
+          content: draft,
+          title: resumeTitle.trim(),
+          design,
+        });
+      }
+      return selected.status === "draft"
         ? careerApi.reviewResume(id)
-        : careerApi.approveResume(id),
+        : careerApi.approveResume(id);
+    },
     onSuccess: refresh,
   });
   const regenerate = useMutation({
@@ -581,7 +600,7 @@ export default function ResumePage() {
                 <select
                   value={design.accent}
                   onChange={(e) =>
-                    setDesign({ ...design, accent: e.target.value })
+                    changeDesign({ ...design, accent: e.target.value })
                   }
                 >
                   {[
@@ -603,7 +622,7 @@ export default function ResumePage() {
                 <select
                   value={design.font}
                   onChange={(e) =>
-                    setDesign({ ...design, font: e.target.value })
+                    changeDesign({ ...design, font: e.target.value })
                   }
                 >
                   <option value="professional">Professional Sans</option>
@@ -620,7 +639,10 @@ export default function ResumePage() {
                   max="110"
                   value={design.textSize}
                   onChange={(e) =>
-                    setDesign({ ...design, textSize: Number(e.target.value) })
+                    changeDesign({
+                      ...design,
+                      textSize: Number(e.target.value),
+                    })
                   }
                 />
               </label>
@@ -633,7 +655,7 @@ export default function ResumePage() {
                   step=".05"
                   value={design.lineSpacing}
                   onChange={(e) =>
-                    setDesign({
+                    changeDesign({
                       ...design,
                       lineSpacing: Number(e.target.value),
                     })
@@ -648,7 +670,7 @@ export default function ResumePage() {
                   max="26"
                   value={design.sectionSpacing}
                   onChange={(e) =>
-                    setDesign({
+                    changeDesign({
                       ...design,
                       sectionSpacing: Number(e.target.value),
                     })
@@ -921,7 +943,7 @@ export default function ResumePage() {
             <DesignPanel
               selected={selected}
               design={design}
-              setDesign={setDesign}
+              setDesign={changeDesign}
               contextual
             />
           )}

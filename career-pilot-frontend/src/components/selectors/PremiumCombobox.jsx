@@ -47,7 +47,7 @@ export default function PremiumCombobox({
                 .toLocaleLowerCase()
                 .includes(query.toLocaleLowerCase()),
             )
-            .slice(0, 30)
+            .slice(0, query.trim() ? 100 : 50)
         : [],
     [options, query, getLabel],
   );

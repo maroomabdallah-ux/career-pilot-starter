@@ -559,7 +559,10 @@ function EducationDrawer({ item, onClose }) {
 
 function GenericDrawer({ config, item, onClose }) {
   const mutation = useChildMutation();
-  const { register, handleSubmit } = useForm({ defaultValues: item || {} });
+  const { register, handleSubmit, watch, setValue } = useForm({
+    defaultValues: item || {},
+  });
+  const isCurrent = Boolean(watch("is_current"));
   return (
     <div className="modal-backdrop">
       <section className="modal">
@@ -572,7 +575,8 @@ function GenericDrawer({ config, item, onClose }) {
           </button>
         </header>
         <form
-          onSubmit={handleSubmit((payload) =>
+          onSubmit={handleSubmit((payload) => {
+            if (isCurrent) payload.end_date = null;
             mutation.mutate(
               {
                 action: item ? "update" : "create",
@@ -583,8 +587,8 @@ function GenericDrawer({ config, item, onClose }) {
                 ),
               },
               { onSuccess: onClose },
-            ),
-          )}
+            );
+          })}
         >
           <div className="form-grid">
             {config.fields.map(([name, label, required, type = "text"]) => (
@@ -592,9 +596,17 @@ function GenericDrawer({ config, item, onClose }) {
                 <span>{label}</span>
                 {type === "textarea" ? (
                   <textarea rows="5" {...register(name, { required })} />
+                ) : name === "proficiency_level" ? (
+                  <select {...register(name)}>
+                    <option value="">Select proficiency</option>
+                    <option value="Entry">Entry</option>
+                    <option value="Intermediate">Intermediate</option>
+                    <option value="Advanced">Advanced</option>
+                  </select>
                 ) : (
                   <input
                     type={type}
+                    disabled={name === "end_date" && isCurrent}
                     {...register(name, {
                       required,
                       valueAsNumber: type === "number",
@@ -604,6 +616,21 @@ function GenericDrawer({ config, item, onClose }) {
               </label>
             ))}
           </div>
+          {(config.api === "experiences" || config.api === "projects") && (
+            <label className="check-control">
+              <input
+                type="checkbox"
+                {...register("is_current")}
+                onChange={(event) => {
+                  setValue("is_current", event.target.checked);
+                  if (event.target.checked) setValue("end_date", "");
+                }}
+              />
+              {config.api === "experiences"
+                ? "I currently work here"
+                : "This project is current"}
+            </label>
+          )}
           <footer>
             <button
               type="button"
@@ -664,7 +691,28 @@ function EducationPage({ items }) {
       {edit !== undefined && (
         <EducationDrawer item={edit} onClose={() => setEdit(undefined)} />
       )}
-      {pendingDelete && <DeleteConfirmationDialog title="Delete education?" description="Remove this education entry from your profile." resourceLabel={[pendingDelete.institution, [pendingDelete.degree, pendingDelete.field_of_study].filter(Boolean).join(" · ")].filter(Boolean).join(" — ")} loading={mutation.isPending} onCancel={() => setPendingDelete(undefined)} onConfirm={() => mutation.mutate({ action: "delete", resource: "education", id: pendingDelete.id }, { onSuccess: () => setPendingDelete(undefined) })} />}
+      {pendingDelete && (
+        <DeleteConfirmationDialog
+          title="Delete education?"
+          description="Remove this education entry from your profile."
+          resourceLabel={[
+            pendingDelete.institution,
+            [pendingDelete.degree, pendingDelete.field_of_study]
+              .filter(Boolean)
+              .join(" · "),
+          ]
+            .filter(Boolean)
+            .join(" — ")}
+          loading={mutation.isPending}
+          onCancel={() => setPendingDelete(undefined)}
+          onConfirm={() =>
+            mutation.mutate(
+              { action: "delete", resource: "education", id: pendingDelete.id },
+              { onSuccess: () => setPendingDelete(undefined) },
+            )
+          }
+        />
+      )}
     </CategoryShell>
   );
 }
@@ -735,7 +783,22 @@ function GenericPage({ config, items }) {
               <section key={name}>
                 <span>{name}</span>
                 <div>
-                  {skills.map((x) => (<div className="skill-chip" key={x.id}><button type="button" onClick={() => setEdit(x)}>{x.name}<small>{x.proficiency_level}</small></button><button type="button" className="icon-button quiet danger" aria-label={`Delete ${x.name}`} onClick={() => setPendingDelete(x)}><Trash2 size={14}/></button></div>))}
+                  {skills.map((x) => (
+                    <div className="skill-chip" key={x.id}>
+                      <button type="button" onClick={() => setEdit(x)}>
+                        {x.name}
+                        <small>{x.proficiency_level}</small>
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button quiet danger"
+                        aria-label={`Delete ${x.name}`}
+                        onClick={() => setPendingDelete(x)}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </section>
             ))}
@@ -750,7 +813,25 @@ function GenericPage({ config, items }) {
             onClose={() => setEdit(undefined)}
           />
         )}
-        {pendingDelete && <DeleteConfirmationDialog title="Delete skill?" description="Remove this skill from your profile." resourceLabel={pendingDelete.name} loading={mutation.isPending} onCancel={() => setPendingDelete(undefined)} onConfirm={() => mutation.mutate({ action: "delete", resource: config.api, id: pendingDelete.id }, { onSuccess: () => setPendingDelete(undefined) })} />}
+        {pendingDelete && (
+          <DeleteConfirmationDialog
+            title="Delete skill?"
+            description="Remove this skill from your profile."
+            resourceLabel={pendingDelete.name}
+            loading={mutation.isPending}
+            onCancel={() => setPendingDelete(undefined)}
+            onConfirm={() =>
+              mutation.mutate(
+                {
+                  action: "delete",
+                  resource: config.api,
+                  id: pendingDelete.id,
+                },
+                { onSuccess: () => setPendingDelete(undefined) },
+              )
+            }
+          />
+        )}
       </CategoryShell>
     );
   }
@@ -811,7 +892,24 @@ function GenericPage({ config, items }) {
           onClose={() => setEdit(undefined)}
         />
       )}
-      {pendingDelete && <DeleteConfirmationDialog title={`Delete ${config.singular}?`} description={`Remove this ${config.singular} from your profile.`} resourceLabel={[x => x.job_title, x => x.company || x.name].map((fn) => fn(pendingDelete)).filter(Boolean).join(" — ")} loading={mutation.isPending} onCancel={() => setPendingDelete(undefined)} onConfirm={() => mutation.mutate({ action: "delete", resource: config.api, id: pendingDelete.id }, { onSuccess: () => setPendingDelete(undefined) })} />}
+      {pendingDelete && (
+        <DeleteConfirmationDialog
+          title={`Delete ${config.singular}?`}
+          description={`Remove this ${config.singular} from your profile.`}
+          resourceLabel={[(x) => x.job_title, (x) => x.company || x.name]
+            .map((fn) => fn(pendingDelete))
+            .filter(Boolean)
+            .join(" — ")}
+          loading={mutation.isPending}
+          onCancel={() => setPendingDelete(undefined)}
+          onConfirm={() =>
+            mutation.mutate(
+              { action: "delete", resource: config.api, id: pendingDelete.id },
+              { onSuccess: () => setPendingDelete(undefined) },
+            )
+          }
+        />
+      )}
     </CategoryShell>
   );
 }

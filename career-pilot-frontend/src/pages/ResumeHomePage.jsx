@@ -7,6 +7,7 @@ import {
   Eye,
   FilePlus2,
   MoreHorizontal,
+  LoaderCircle,
   Trash2,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -17,6 +18,7 @@ export default function ResumeHomePage() {
   const navigate = useNavigate();
   const client = useQueryClient();
   const [menu, setMenu] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
   const resumes = useQuery({
     queryKey: ["resumes"],
     queryFn: careerApi.listResumes,
@@ -38,6 +40,7 @@ export default function ResumeHomePage() {
     onSuccess: refresh,
   });
   const exportPdf = async (item) => {
+    setDownloadingId(item.id);
     try {
       const { data } = await careerApi.exportResume(item.id);
       const url = URL.createObjectURL(data);
@@ -48,6 +51,8 @@ export default function ResumeHomePage() {
       URL.revokeObjectURL(url);
     } catch (error) {
       window.alert(apiErrorMessage(error));
+    } finally {
+      setDownloadingId(null);
     }
   };
   if (resumes.isLoading)
@@ -117,6 +122,7 @@ export default function ResumeHomePage() {
                   <ResumePreview
                     content={item.content}
                     templateId={item.template_id}
+                    design={item.design}
                   />
                 </div>
               </Link>
@@ -154,9 +160,18 @@ export default function ResumeHomePage() {
                       <Eye size={14} />
                       Preview
                     </Link>
-                    <button onClick={() => exportPdf(item)}>
-                      <Download size={14} />
-                      Download
+                    <button
+                      disabled={downloadingId === item.id}
+                      onClick={() => exportPdf(item)}
+                    >
+                      {downloadingId === item.id ? (
+                        <LoaderCircle className="spin" size={14} />
+                      ) : (
+                        <Download size={14} />
+                      )}
+                      {downloadingId === item.id
+                        ? "Preparing PDF…"
+                        : "Download"}
                     </button>
                     <button onClick={() => duplicate.mutate(item.id)}>
                       <Copy size={14} />

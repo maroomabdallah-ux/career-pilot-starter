@@ -1,17 +1,27 @@
-import logging
 import asyncio
-from uuid import UUID
-from uuid import uuid4
+import logging
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Response, status
 from fastapi.responses import JSONResponse
 
-from app.api.dependencies import CurrentUser, SessionDep
-from app.graphs.resume_graph import ResumeGenerationStageError, resume_copilot_graph, resume_graph
-from app.schemas.resume import (ResumeAnalysisResponse, ResumeCoachRequest, ResumeCoachResponse,
-    ResumeEvidence, ResumeGenerate, ResumeRegenerate, ResumeResponse, ResumeSuggestion,
-    ResumeSuggestionApply, ResumeUpdate)
 from app.agents.resume.service import ResumeWritingService
+from app.ai.context import ai_conversation
+from app.api.dependencies import AccessTokenDep, AIUser, CurrentUser, SessionDep
+from app.graphs.resume_graph import ResumeGenerationStageError, resume_copilot_graph, resume_graph
+from app.mcp.clients.core_client import CareerPilotMCPClient
+from app.schemas.resume import (
+    ResumeAnalysisResponse,
+    ResumeCoachRequest,
+    ResumeCoachResponse,
+    ResumeEvidence,
+    ResumeGenerate,
+    ResumeRegenerate,
+    ResumeResponse,
+    ResumeSuggestion,
+    ResumeSuggestionApply,
+    ResumeUpdate,
+)
 from app.services.resume import ResumeService
 from app.services.resume_context import ResumeContextBuilder
 from app.services.resume_intelligence import analyze_resume, apply_suggestion, validate_suggestion
@@ -36,14 +46,25 @@ def service(session, user):
     return ResumeService(session, user.id)
 
 
+async def read_resume_from_mcp(access_token: str, resume_id: UUID):
+    client = CareerPilotMCPClient(access_token)
+    try:
+        async with client.read_session() as mcp:
+            return await mcp.get_resume(resume_id)
+    except Exception as exc:
+        if "Resume not found" in str(exc):
+            raise HTTPException(404, "Resume not found") from exc
+        raise HTTPException(502, "CareerPilot could not load Resume context.") from exc
+
+
 @router.get("/templates")
 async def list_templates():
     return list(TEMPLATES.values())
 
 
 @router.get("/readiness")
-async def resume_readiness(session: SessionDep, user: CurrentUser):
-    return (await ResumeContextBuilder(session, user).build(with_rag=False)).readiness
+async def resume_readiness(user: CurrentUser, access_token: AccessTokenDep):
+    return (await ResumeContextBuilder(user, access_token).build(with_rag=False)).readiness
 
 
 @router.get("", response_model=list[ResumeResponse])
@@ -52,9 +73,14 @@ async def list_resumes(session: SessionDep, user: CurrentUser):
 
 
 @router.post("/generate", response_model=ResumeResponse, status_code=201)
-async def generate(data: ResumeGenerate, session: SessionDep, user: CurrentUser):
+async def generate(
+    data: ResumeGenerate,
+    session: SessionDep,
+    user: AIUser,
+    access_token: AccessTokenDep,
+):
     try:
-        context = await ResumeContextBuilder(session, user).build(data.include_projects)
+        context = await ResumeContextBuilder(user, access_token).build(data.include_projects)
     except Exception:
         logger.exception(
             "Resume generation failed",
@@ -66,9 +92,10 @@ async def generate(data: ResumeGenerate, session: SessionDep, user: CurrentUser)
             422, {"message": "Your profile needs more information.", **context.readiness}
         )
     try:
-        result = await resume_graph.ainvoke(
-            {"verified": context.verified, "section": "all", "rag": context.supporting_rag}
-        )
+        with ai_conversation(None):
+            result = await resume_graph.ainvoke(
+                {"verified": context.verified, "section": "all", "rag": context.supporting_rag}
+            )
     except ResumeGenerationStageError as exc:
         logger.exception(
             "Resume generation failed",
@@ -135,25 +162,27 @@ async def approve_resume(resume_id: UUID, session: SessionDep, user: CurrentUser
 
 @router.post("/{resume_id}/regenerate-section", response_model=ResumeResponse)
 async def regenerate_section(
-    resume_id: UUID, data: ResumeRegenerate, session: SessionDep, user: CurrentUser
+    resume_id: UUID,
+    data: ResumeRegenerate,
+    session: SessionDep,
+    user: AIUser,
+    access_token: AccessTokenDep,
 ):
     resume_service = service(session, user)
-    try:
-        resume = await resume_service.get(resume_id)
-    except ValueError as exc:
-        raise HTTPException(404, str(exc)) from exc
-    if resume.status == "approved":
+    resume = await read_resume_from_mcp(access_token, resume_id)
+    if resume["status"] == "approved":
         raise HTTPException(409, "Approved resumes cannot be regenerated. Create a new version.")
-    context = await ResumeContextBuilder(session, user).build()
+    context = await ResumeContextBuilder(user, access_token).build()
     try:
-        result = await resume_graph.ainvoke(
-            {
-                "verified": context.verified,
-                "existing": resume.content,
-                "section": data.section.value,
-                "rag": context.supporting_rag,
-            }
-        )
+        with ai_conversation(str(resume_id)):
+            result = await resume_graph.ainvoke(
+                {
+                    "verified": context.verified,
+                    "existing": resume["content"],
+                    "section": data.section.value,
+                    "rag": context.supporting_rag,
+                }
+            )
     except Exception as exc:
         raise HTTPException(502, "CareerPilot could not regenerate this section safely.") from exc
     if result.get("error"):
@@ -162,26 +191,52 @@ async def regenerate_section(
 
 
 @router.get("/{resume_id}/analysis", response_model=ResumeAnalysisResponse)
-async def analyze(resume_id: UUID, session: SessionDep, user: CurrentUser):
-    resume = await service(session, user).get(resume_id)
-    context = await ResumeContextBuilder(session, user).build()
-    return analyze_resume(resume.content, context.verified, context.supporting_rag)
+async def analyze(resume_id: UUID, user: CurrentUser, access_token: AccessTokenDep):
+    resume = await read_resume_from_mcp(access_token, resume_id)
+    context = await ResumeContextBuilder(user, access_token).build()
+    return analyze_resume(resume["content"], context.verified, context.supporting_rag)
 
 
 @router.post("/{resume_id}/copilot", response_model=ResumeCoachResponse)
-async def coach(resume_id: UUID, data: ResumeCoachRequest, session: SessionDep, user: CurrentUser):
-    resume = await service(session, user).get(resume_id)
-    context = await ResumeContextBuilder(session, user).build()
-    result = await resume_copilot_graph.ainvoke({"content": resume.content,
-        "verified": context.verified, "rag": context.supporting_rag,
-        "selection": data.selection.model_dump(), "message": data.message,
-        "user_answer": data.user_answer or ""})
+async def coach(
+    resume_id: UUID,
+    data: ResumeCoachRequest,
+    user: AIUser,
+    access_token: AccessTokenDep,
+):
+    resume = await read_resume_from_mcp(access_token, resume_id)
+    context = await ResumeContextBuilder(user, access_token).build()
+    result = await resume_copilot_graph.ainvoke(
+        {
+            "content": resume["content"],
+            "verified": context.verified,
+            "rag": context.supporting_rag,
+            "selection": data.selection.model_dump(),
+            "message": data.message,
+            "user_answer": data.user_answer or "",
+        }
+    )
     analysis = result["analysis"]
     message = data.message.casefold()
-    write_requested = bool(data.user_answer) or any(token in message for token in (
-        "generate", "write", "improve", "rewrite", "short", "concise", "technical",
-        "professional", "bullet", "حسن", "اكتب", "اختصر", "تقني", "نقاط",
-    ))
+    write_requested = bool(data.user_answer) or any(
+        token in message
+        for token in (
+            "generate",
+            "write",
+            "improve",
+            "rewrite",
+            "short",
+            "concise",
+            "technical",
+            "professional",
+            "bullet",
+            "حسن",
+            "اكتب",
+            "اختصر",
+            "تقني",
+            "نقاط",
+        )
+    )
     if write_requested and (not analysis.missing_information or data.user_answer):
         verified = dict(context.verified)
         if data.user_answer:
@@ -195,60 +250,122 @@ async def coach(resume_id: UUID, data: ResumeCoachRequest, session: SessionDep, 
                 "summary; concise version",
             ]
         try:
-            writings = await asyncio.gather(*(
-                ResumeWritingService().generate(verified, prompt, context.supporting_rag)
-                for prompt in prompts
-            ))
+            with ai_conversation(str(resume_id)):
+                writings = await asyncio.gather(
+                    *(
+                        ResumeWritingService().generate(
+                            verified, prompt, context.supporting_rag
+                        )
+                        for prompt in prompts
+                    )
+                )
         except Exception as exc:
-            logger.exception("Resume suggestion generation failed", extra={"resume_id": str(resume_id)})
-            raise HTTPException(502, "CareerPilot could not create grounded suggestions right now.") from exc
-        evidence = [ResumeEvidence(source_type="profile", domain=section, excerpt="Verified Career Profile")]
+            logger.exception(
+                "Resume suggestion generation failed", extra={"resume_id": str(resume_id)}
+            )
+            raise HTTPException(
+                502, "CareerPilot could not create grounded suggestions right now."
+            ) from exc
+        evidence = [
+            ResumeEvidence(source_type="profile", domain=section, excerpt="Verified Career Profile")
+        ]
         if data.user_answer:
-            evidence.append(ResumeEvidence(source_type="user_answer", domain=section, excerpt=data.user_answer.strip()))
+            evidence.append(
+                ResumeEvidence(
+                    source_type="user_answer", domain=section, excerpt=data.user_answer.strip()
+                )
+            )
         generated = []
         if section == "summary":
-            for label, writing in zip(("Professional", "Technical", "Concise"), writings, strict=True):
+            for label, writing in zip(
+                ("Professional", "Technical", "Concise"), writings, strict=True
+            ):
                 if writing.summary:
                     generated.append((label, writing.summary, "rewrite"))
         elif section == "experience":
             index = data.selection.item_index or 0
             for item in writings[0].experience:
                 if item.index == index:
-                    generated.extend(("Suggested bullet", bullet, "strengthen") for bullet in item.bullets)
+                    generated.extend(
+                        ("Suggested bullet", bullet, "strengthen") for bullet in item.bullets
+                    )
         elif section == "projects":
             index = data.selection.item_index or 0
             for item in writings[0].projects:
                 if item.index == index and item.description:
                     generated.append(("Improved description", item.description, "rewrite"))
         elif section == "skills":
-            current = {skill.casefold() for group in resume.content.get("skill_groups", []) for skill in group.get("items", [])}
+            current = {
+                skill.casefold()
+                for group in resume["content"].get("skill_groups", [])
+                for skill in group.get("items", [])
+            }
             for group in writings[0].skill_groups.values():
-                generated.extend(("Verified missing skill", skill, "add_existing_fact") for skill in group if skill.casefold() not in current)
+                generated.extend(
+                    ("Verified missing skill", skill, "add_existing_fact")
+                    for skill in group
+                    if skill.casefold() not in current
+                )
         for label, text, suggestion_type in reversed(generated[:3]):
-            analysis.supported_suggestions.insert(0, ResumeSuggestion(
-                id=str(uuid4()), section=section, item_index=data.selection.item_index,
-                bullet_index=data.selection.bullet_index, type=suggestion_type, label=label,
-                reason="Written from verified Career Profile information and relevant saved context.",
-                suggestion=text, evidence=evidence, requires_confirmation=False,
-            ))
-    return ResumeCoachResponse(selection=data.selection, analysis=analysis,
-        detected_intent=result["intent"], response_language=result["language"],
-        relevant_context=result.get("relevant_context", []), profile_update_requires_approval=bool(data.user_answer))
+            analysis.supported_suggestions.insert(
+                0,
+                ResumeSuggestion(
+                    id=str(uuid4()),
+                    section=section,
+                    item_index=data.selection.item_index,
+                    bullet_index=data.selection.bullet_index,
+                    type=suggestion_type,
+                    label=label,
+                    reason=(
+                        "Written from verified Career Profile information "
+                        "and relevant saved context."
+                    ),
+                    suggestion=text,
+                    evidence=evidence,
+                    requires_confirmation=False,
+                ),
+            )
+    return ResumeCoachResponse(
+        selection=data.selection,
+        analysis=analysis,
+        detected_intent=result["intent"],
+        response_language=result["language"],
+        relevant_context=result.get("relevant_context", []),
+        profile_update_requires_approval=bool(data.user_answer),
+    )
 
 
 @router.post("/{resume_id}/suggestions/apply", response_model=ResumeResponse)
-async def accept_suggestion(resume_id: UUID, data: ResumeSuggestionApply, session: SessionDep, user: CurrentUser):
+async def accept_suggestion(
+    resume_id: UUID,
+    data: ResumeSuggestionApply,
+    session: SessionDep,
+    user: CurrentUser,
+    access_token: AccessTokenDep,
+):
     resume_service = service(session, user)
-    resume = await resume_service.get(resume_id)
-    if resume.status == "approved":
+    resume = await read_resume_from_mcp(access_token, resume_id)
+    if resume["status"] == "approved":
         raise HTTPException(409, "Approved resumes are immutable. Create a new version.")
-    context = await ResumeContextBuilder(session, user).build()
-    candidate = data.suggestion.model_copy(update={"suggestion": data.edited_text or data.suggestion.suggestion})
-    errors = validate_suggestion(candidate, context.verified, context.supporting_rag,
-        "confirmed" if data.confirmed else (data.edited_text if any(e.source_type == "user_answer" for e in candidate.evidence) else None))
+    context = await ResumeContextBuilder(user, access_token).build()
+    candidate = data.suggestion.model_copy(
+        update={"suggestion": data.edited_text or data.suggestion.suggestion}
+    )
+    errors = validate_suggestion(
+        candidate,
+        context.verified,
+        context.supporting_rag,
+        "confirmed"
+        if data.confirmed
+        else (
+            data.edited_text
+            if any(e.source_type == "user_answer" for e in candidate.evidence)
+            else None
+        ),
+    )
     if errors:
         raise HTTPException(422, {"message": "Suggestion validation failed.", "issues": errors})
-    updated = apply_suggestion(resume.content, candidate, data.edited_text)
+    updated = apply_suggestion(resume["content"], candidate, data.edited_text)
     return await resume_service.update(resume_id, ResumeUpdate(content=updated))
 
 

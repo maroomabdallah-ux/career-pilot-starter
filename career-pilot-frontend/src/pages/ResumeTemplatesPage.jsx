@@ -7,6 +7,7 @@ import {
   Eye,
   Search,
   Sparkles,
+  LoaderCircle,
   X,
 } from "lucide-react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -112,13 +113,19 @@ export default function ResumeTemplatesPage() {
     [category, search, filters],
   );
   const choose = useMutation({
-    mutationFn: async (id) =>
-      resumeId
-        ? careerApi.updateResume(resumeId, { template_id: id })
-        : careerApi.generateResume({
-            title: `Resume V${(resumes.data?.length || 0) + 1}`,
-            template_id: id,
-          }),
+    mutationFn: async (id) => {
+      if (resumeId) {
+        return careerApi.updateResume(resumeId, {
+          template_id: id,
+          design: { ...(current?.design || {}), accent },
+        });
+      }
+      const created = await careerApi.generateResume({
+        title: `Resume V${(resumes.data?.length || 0) + 1}`,
+        template_id: id,
+      });
+      return careerApi.updateResume(created.id, { design: { accent } });
+    },
     onSuccess: async (result) => {
       localStorage.setItem("careerpilot_resume_template", result.template_id);
       localStorage.setItem("careerpilot_resume_accent", accent);
@@ -308,7 +315,12 @@ export default function ResumeTemplatesPage() {
                     disabled={choose.isPending}
                     onClick={() => choose.mutate(template.id)}
                   >
-                    Use this template
+                    {choose.isPending && choose.variables === template.id ? (
+                      <LoaderCircle className="spin" size={16} />
+                    ) : null}
+                    {choose.isPending && choose.variables === template.id
+                      ? "Loading template…"
+                      : "Use this template"}
                   </button>
                 </div>
                 {!current && <span className="demo-label">Sample content</span>}
@@ -334,9 +346,12 @@ export default function ResumeTemplatesPage() {
               )}
               <button
                 className="button use-template-mobile"
+                disabled={choose.isPending}
                 onClick={() => choose.mutate(template.id)}
               >
-                Use this template
+                {choose.isPending && choose.variables === template.id
+                  ? "Loading template…"
+                  : "Use this template"}
               </button>
             </article>
           );
@@ -358,10 +373,15 @@ export default function ResumeTemplatesPage() {
             </div>
             <button
               className="button primary"
+              disabled={choose.isPending}
               onClick={() => choose.mutate(preview.id)}
             >
-              <Check size={15} />
-              Use this template
+              {choose.isPending ? (
+                <LoaderCircle className="spin" size={15} />
+              ) : (
+                <Check size={15} />
+              )}
+              {choose.isPending ? "Loading template…" : "Use this template"}
             </button>
           </div>
           <div className="preview-modal-canvas">

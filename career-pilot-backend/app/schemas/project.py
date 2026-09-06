@@ -14,6 +14,7 @@ class ProjectBase(DateRangeMixin):
     repository_url: HttpUrl | None = None
     start_date: date | None = None
     end_date: date | None = None
+    is_current: bool = False
 
 
 class ProjectCreate(ProjectBase):
@@ -30,6 +31,7 @@ class ProjectUpdate(DateRangeMixin):
     repository_url: HttpUrl | None = None
     start_date: date | None = None
     end_date: date | None = None
+    is_current: bool | None = None
 
 
 class ProjectResponse(ProjectBase, ORMResponse):

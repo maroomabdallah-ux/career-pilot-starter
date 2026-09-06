@@ -63,6 +63,9 @@ class ResumeProjectItem(BaseModel):
     technologies: list[str] = Field(default_factory=list)
     project_url: str | None = None
     repository_url: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    is_current: bool = False
     visible: bool = True
 
 
@@ -124,6 +127,7 @@ class ResumeUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     content: ResumeDraft | None = None
     template_id: str | None = None
+    design: dict[str, Any] | None = None
 
 
 class ResumeResponse(ORMResponse):
@@ -134,6 +138,7 @@ class ResumeResponse(ORMResponse):
     template_id: str
     language: str
     content: dict[str, Any]
+    design: dict[str, Any] = Field(default_factory=dict)
 
 
 class ResumeReadiness(BaseModel):
@@ -162,8 +167,13 @@ class ResumeSuggestion(BaseModel):
     item_index: int | None = None
     bullet_index: int | None = None
     type: Literal[
-        "rewrite", "shorten", "strengthen", "add_existing_fact",
-        "remove_generic_content", "ask_for_detail", "missing_metric",
+        "rewrite",
+        "shorten",
+        "strengthen",
+        "add_existing_fact",
+        "remove_generic_content",
+        "ask_for_detail",
+        "missing_metric",
     ]
     suggestion: str | None = None
     label: str

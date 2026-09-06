@@ -1,4 +1,5 @@
 import {
+  Activity,
   BadgeHelp,
   BookOpen,
   BriefcaseBusiness,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import useAppStore from "../../store/useAppStore";
+import { useAuthStore } from "../../features/auth/auth.store";
 
 const primary = [
   ["Dashboard", "/app/dashboard", LayoutDashboard, true],
@@ -47,12 +49,15 @@ function RailLink({ item, onNavigate }) {
       onClick={onNavigate}
     >
       <Icon size={19} strokeWidth={1.8} />
-      <span className="rail-tooltip" role="tooltip">{label}</span>
+      <span className="rail-tooltip" role="tooltip">
+        {label}
+      </span>
     </NavLink>
   );
 }
 
 export default function Sidebar() {
+  const isAdmin = useAuthStore((state) => state.user?.is_admin);
   const open = useAppStore((state) => state.sidebarOpen);
   const setOpen = useAppStore((state) => state.setSidebarOpen);
   const close = () => setOpen(false);
@@ -60,28 +65,63 @@ export default function Sidebar() {
   return (
     <aside className={`sidebar navigation-rail ${open ? "is-open" : ""}`}>
       <div className="rail-top">
-        <NavLink className="rail-logo" to="/app/dashboard" aria-label="CareerPilot AI" onClick={close}>
+        <NavLink
+          className="rail-logo"
+          to="/app/dashboard"
+          aria-label="CareerPilot AI"
+          onClick={close}
+        >
           <img src="/careerpilot-logo.png" alt="CareerPilot AI" />
         </NavLink>
-        <button className="icon-button rail-close mobile-only" onClick={close} aria-label="Close navigation">
+        <button
+          className="icon-button rail-close mobile-only"
+          onClick={close}
+          aria-label="Close navigation"
+        >
           <X size={18} />
         </button>
-        <NavLink className="rail-ai" to="/app/profile" aria-label="Career profile" onClick={close}>
+        <NavLink
+          className="rail-ai"
+          to="/app/profile"
+          aria-label="Career profile"
+          onClick={close}
+        >
           <Sparkles size={18} strokeWidth={1.8} />
           <span className="rail-tooltip">AI Assistant</span>
         </NavLink>
       </div>
 
       <nav className="rail-navigation" aria-label="Main navigation">
-        <div className="rail-group">{primary.map((item) => <RailLink key={item[0]} item={item} onNavigate={close} />)}</div>
+        <div className="rail-group">
+          {primary.map((item) => (
+            <RailLink key={item[0]} item={item} onNavigate={close} />
+          ))}
+        </div>
         <div className="rail-divider" />
-        <div className="rail-group">{careerTools.map((item) => <RailLink key={item[0]} item={item} onNavigate={close} />)}</div>
+        <div className="rail-group">
+          {careerTools.map((item) => (
+            <RailLink key={item[0]} item={item} onNavigate={close} />
+          ))}
+        </div>
       </nav>
 
       <div className="rail-bottom">
         <div className="rail-divider" />
-        {secondary.map((item) => <RailLink key={item[0]} item={item} onNavigate={close} />)}
-        <NavLink className="rail-avatar" to="/app/settings" aria-label="User settings" onClick={close}>
+        {isAdmin && (
+          <RailLink
+            item={["AI Usage Admin", "/app/admin/ai-usage", Activity]}
+            onNavigate={close}
+          />
+        )}
+        {secondary.map((item) => (
+          <RailLink key={item[0]} item={item} onNavigate={close} />
+        ))}
+        <NavLink
+          className="rail-avatar"
+          to="/app/settings"
+          aria-label="User settings"
+          onClick={close}
+        >
           CP<span className="rail-tooltip">Your profile</span>
         </NavLink>
       </div>

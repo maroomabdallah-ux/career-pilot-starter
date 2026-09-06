@@ -4,7 +4,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import Date, ForeignKey, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.mutable import MutableList
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -31,4 +31,5 @@ class Project(UUIDTimestampMixin, Base):
     repository_url: Mapped[str | None] = mapped_column(String(2048))
     start_date: Mapped[date | None] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     career_profile: Mapped[CareerProfile] = relationship(back_populates="projects")

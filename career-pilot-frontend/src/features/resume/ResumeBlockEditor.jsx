@@ -216,6 +216,22 @@ export default function ResumeBlockEditor({
                   "End date",
                 )}
               </div>
+              <label className="check-control">
+                <input
+                  type="checkbox"
+                  checked={Boolean(item.is_current)}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    update(
+                      ["experience", i, "is_current"],
+                      event.target.checked,
+                    );
+                    if (event.target.checked)
+                      update(["experience", i, "end_date"], "");
+                  }}
+                />
+                Current role
+              </label>
               <label>Bullets</label>
               {item.bullets.map((bullet, b) => (
                 <div className="compact-list-row" key={b}>
@@ -326,7 +342,26 @@ export default function ResumeBlockEditor({
                   item.repository_url,
                   "Repository URL",
                 )}
+                {field(
+                  ["projects", i, "start_date"],
+                  item.start_date,
+                  "Start date",
+                )}
+                {field(["projects", i, "end_date"], item.end_date, "End date")}
               </div>
+              <label className="check-control">
+                <input
+                  type="checkbox"
+                  checked={Boolean(item.is_current)}
+                  disabled={disabled}
+                  onChange={(event) => {
+                    update(["projects", i, "is_current"], event.target.checked);
+                    if (event.target.checked)
+                      update(["projects", i, "end_date"], "");
+                  }}
+                />
+                Current project
+              </label>
               <RichTextField
                 value={item.description || ""}
                 disabled={disabled}

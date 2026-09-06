@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from functools import lru_cache
 import logging
 import re
+from functools import lru_cache
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
 
 from app.agents.profile.schemas import IntentResult
+from app.ai.factory import create_chat_model
 from app.core.config import settings
-
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +16,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Exceptions
 # ============================================================
+
 
 class ProfileAgentConfigurationError(RuntimeError):
     """Raised when the Profile Agent is not configured correctly."""
@@ -306,8 +306,13 @@ For skills:
 
 "rename JavaScript to TypeScript"
 
-Only classify as update if the current application domain supports such an
-operation. Otherwise represent the closest valid intent conservatively.
+→ update_skill
+
+fields.target:
+name = "JavaScript"
+
+fields.changes:
+name = "TypeScript"
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 DELETE BEHAVIOR
@@ -518,7 +523,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
     [
         ("system", SYSTEM_PROMPT),
         ("system", CLASSIFICATION_PROMPT),
-
         # Greeting
         ("human", "hi"),
         (
@@ -534,7 +538,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Capability question
         ("human", "what can you help me with?"),
         (
@@ -550,7 +553,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Read
         ("human", "what are my skills?"),
         (
@@ -566,7 +568,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Arabic read
         ("human", "شو المهارات اللي عندي؟"),
         (
@@ -582,7 +583,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Add skill
         ("human", "ضيفلي Python و FastAPI على السكيلز"),
         (
@@ -600,7 +600,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Delete
         ("human", "احذف Python"),
         (
@@ -620,7 +619,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Experience with missing information
         ("human", "I worked at Microsoft"),
         (
@@ -638,7 +636,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Mixed-language update
         (
             "human",
@@ -664,7 +661,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Gap analysis
         ("human", "شو ناقص بالبروفايل تبعي؟"),
         (
@@ -680,7 +676,6 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 }
 """,
         ),
-
         # Actual request
         ("human", "{{message}}"),
     ],
@@ -692,22 +687,20 @@ INTENT_PROMPT = ChatPromptTemplate.from_messages(
 # LLM configuration
 # ============================================================
 
+
 @lru_cache(maxsize=1)
-def get_profile_llm() -> ChatOpenAI:
+def get_profile_llm():
     if not settings.OPENAI_API_KEY:
         raise ProfileAgentConfigurationError(
-            "CareerPilot AI is not configured. "
-            "Set OPENAI_API_KEY before using the Profile Agent."
+            "CareerPilot AI is not configured. Set OPENAI_API_KEY before using the Profile Agent."
         )
 
     if not settings.PROFILE_AGENT_MODEL:
-        raise ProfileAgentConfigurationError(
-            "PROFILE_AGENT_MODEL is not configured."
-        )
+        raise ProfileAgentConfigurationError("PROFILE_AGENT_MODEL is not configured.")
 
-    return ChatOpenAI(
+    return create_chat_model(
+        agent_name="profile_agent",
         model=settings.PROFILE_AGENT_MODEL,
-        api_key=settings.OPENAI_API_KEY,
         temperature=0,
         timeout=30,
         max_retries=2,
@@ -734,6 +727,7 @@ def get_understanding_chain():
 # Profile semantic understanding service
 # ============================================================
 
+
 class ProfileUnderstandingService:
     """
     Converts natural-language user requests into validated semantic intent.
@@ -751,14 +745,10 @@ class ProfileUnderstandingService:
         normalized = normalize_user_message(message)
 
         if not normalized:
-            raise ProfileUnderstandingError(
-                "A non-empty message is required."
-            )
+            raise ProfileUnderstandingError("A non-empty message is required.")
 
         try:
-            result: IntentResult = await get_understanding_chain().ainvoke(
-                {"message": normalized}
-            )
+            result: IntentResult = await get_understanding_chain().ainvoke({"message": normalized})
 
         except ProfileAgentConfigurationError:
             raise
@@ -793,11 +783,7 @@ class ProfileUnderstandingService:
         """
 
         if result.confidence is None:
-            raise ProfileUnderstandingError(
-                "Intent confidence was not returned."
-            )
+            raise ProfileUnderstandingError("Intent confidence was not returned.")
 
         if result.confidence < 0 or result.confidence > 1:
-            raise ProfileUnderstandingError(
-                "Intent confidence is outside the valid range."
-            )
+            raise ProfileUnderstandingError("Intent confidence is outside the valid range.")

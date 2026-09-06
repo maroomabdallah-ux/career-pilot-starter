@@ -52,6 +52,7 @@ async def run_tool(
             extra={
                 "mcp": {
                     "tool": name,
+                    "operation": name.split("_", 1)[0],
                     "success": True,
                     "duration_ms": round((time.perf_counter() - started) * 1000, 2),
                     "user_id": user_id,
@@ -67,12 +68,13 @@ async def run_tool(
         raise ToolError(str(exc)) from exc
     except Exception as exc:
         _log_failure(name, started, user_id, exception=True)
-        raise ToolError("CareerPilot could not complete this read operation") from exc
+        raise ToolError("CareerPilot could not complete this operation") from exc
 
 
 def _log_failure(name: str, started: float, user_id: str, *, exception: bool = False) -> None:
     details: dict[str, Any] = {
         "tool": name,
+        "operation": name.split("_", 1)[0],
         "success": False,
         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         "user_id": user_id,
