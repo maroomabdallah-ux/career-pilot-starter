@@ -1,6 +1,7 @@
 import apiClient from "./apiClient";
 
 const data = (request) => request.then((response) => response.data);
+const AI_REQUEST_TIMEOUT = 180000;
 
 export const careerApi = {
   getProfile: () => data(apiClient.get("/me/profile")),
@@ -19,7 +20,11 @@ export const careerApi = {
   listResumes: () => data(apiClient.get("/resumes")),
   getResumeReadiness: () => data(apiClient.get("/resumes/readiness")),
   generateResume: (payload) =>
-    data(apiClient.post("/resumes/generate", payload)),
+    data(
+      apiClient.post("/resumes/generate", payload, {
+        timeout: AI_REQUEST_TIMEOUT,
+      }),
+    ),
   approveResume: (id) => data(apiClient.post(`/resumes/${id}/approve`)),
   reviewResume: (id) => data(apiClient.post(`/resumes/${id}/review`)),
   updateResume: (id, payload) =>
@@ -27,10 +32,20 @@ export const careerApi = {
   duplicateResume: (id) => data(apiClient.post(`/resumes/${id}/duplicate`)),
   deleteResume: (id) => apiClient.delete(`/resumes/${id}`),
   regenerateResumeSection: (id, section) =>
-    data(apiClient.post(`/resumes/${id}/regenerate-section`, { section })),
+    data(
+      apiClient.post(
+        `/resumes/${id}/regenerate-section`,
+        { section },
+        { timeout: AI_REQUEST_TIMEOUT },
+      ),
+    ),
   analyzeResume: (id) => data(apiClient.get(`/resumes/${id}/analysis`)),
   coachResume: (id, payload) =>
-    data(apiClient.post(`/resumes/${id}/copilot`, payload)),
+    data(
+      apiClient.post(`/resumes/${id}/copilot`, payload, {
+        timeout: AI_REQUEST_TIMEOUT,
+      }),
+    ),
   applyResumeSuggestion: (id, payload) =>
     data(apiClient.post(`/resumes/${id}/suggestions/apply`, payload)),
   exportResume: (id) =>
@@ -49,6 +64,9 @@ export const careerApi = {
 };
 
 export function apiErrorMessage(error) {
+  if (error?.code === "ECONNABORTED") {
+    return "CareerPilot is taking longer than expected to generate your content. Please try again.";
+  }
   if (!error?.response) {
     return "CareerPilot could not reach the API. Make sure the backend is running on port 8000.";
   }

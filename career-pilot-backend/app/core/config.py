@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     MCP_AUTH_ISSUER_URL: str = "http://localhost:8000"
     MCP_HOST: str = "127.0.0.1"
     MCP_PORT: int = 8001
+    ADZUNA_APP_ID: str | None = None
+    ADZUNA_APP_KEY: str | None = None
+    ADZUNA_COUNTRY: str = "gb"
+    JOOBLE_API_KEY: str | None = None
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

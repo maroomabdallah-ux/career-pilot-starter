@@ -17,7 +17,7 @@ class JobSearchState(TypedDict, total=False):
     result: dict[str, Any]
 
 
-async def understand(state, _config):
+async def understand(state):
     if state.get("supplied_criteria"):
         return {"extracted": state["supplied_criteria"]}
     return {"extracted": understand_job_search(state.get("prompt", ""))}
@@ -34,7 +34,7 @@ async def load_profile(state, config):
     return {"profile": profile, "skills": skills}
 
 
-async def resolve(state, _config):
+async def resolve(state):
     values = dict(state["extracted"])
     profile = state.get("profile", {})
     skills = state.get("skills", [])

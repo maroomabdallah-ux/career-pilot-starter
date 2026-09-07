@@ -1,8 +1,10 @@
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from app.agents.jobs.service import understand_job_search
+from app.graphs.job_search_graph import job_search_graph
 from app.schemas.job import JobResult, JobSearchCriteria
 from app.services.job_search import JobSearchService
 
@@ -37,6 +39,22 @@ class Source:
         if self.error:
             raise self.error
         return self.rows
+
+
+class FakeMCP:
+    @asynccontextmanager
+    async def read_session(self):
+        yield self
+
+    async def search_jobs(self, criteria):
+        parsed = JobSearchCriteria.model_validate(criteria)
+        return {
+            "criteria": parsed.model_dump(mode="json"),
+            "jobs": [],
+            "result_count": 0,
+            "source_failures": [],
+            "message": None,
+        }
 
 
 @pytest.mark.parametrize(
@@ -125,3 +143,28 @@ async def test_short_cache_avoids_repeating_identical_source_call():
     await service.search(criteria)
     await service.search(criteria)
     assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_job_search_graph_accepts_structured_criteria():
+    state = await job_search_graph.ainvoke(
+        {
+            "prompt": "",
+            "supplied_criteria": {
+                "query": "Python",
+                "workplace_type": "remote",
+                "limit": 5,
+            },
+        },
+        config={"configurable": {"mcp_client": FakeMCP()}},
+    )
+
+    assert state["result"]["criteria"]["query"] == "Python"
+
+
+@pytest.mark.asyncio
+async def test_no_configured_sources_returns_actionable_message():
+    result = await JobSearchService(sources=[]).search(JobSearchCriteria(query="Python"))
+
+    assert result.jobs == []
+    assert "No job providers are configured" in result.message

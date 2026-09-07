@@ -10,6 +10,7 @@ WorkplaceType = Literal["remote", "hybrid", "on-site", "unknown"]
 class JobSearchCriteria(BaseModel):
     query: str = Field(min_length=2, max_length=200)
     location: str | None = Field(default=None, max_length=160)
+    country: str | None = Field(default=None, max_length=100)
     workplace_type: WorkplaceType | None = None
     employment_type: str | None = Field(default=None, max_length=60)
     experience_level: str | None = Field(default=None, max_length=60)
@@ -17,7 +18,7 @@ class JobSearchCriteria(BaseModel):
     skills: list[str] = Field(default_factory=list, max_length=25)
     limit: int = Field(default=20, ge=1, le=50)
 
-    @field_validator("query", "location", "employment_type", "experience_level")
+    @field_validator("query", "location", "country", "employment_type", "experience_level")
     @classmethod
     def trim(cls, value):
         return value.strip() if isinstance(value, str) else value

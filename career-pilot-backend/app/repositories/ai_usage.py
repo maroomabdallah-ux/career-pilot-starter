@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import String, cast, func, select
+from sqlalchemy import func, select
 
 from app.models.ai_usage import AIUsage
 from app.models.user import User
@@ -119,7 +119,7 @@ class AIUsageRepository:
         )
 
     async def daily(self, filters):
-        day = cast(AIUsage.created_at, String).substr(1, 10)
+        day = func.date(AIUsage.created_at)
         return (
             (
                 await self.session.execute(

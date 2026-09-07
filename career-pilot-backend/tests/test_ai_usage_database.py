@@ -132,6 +132,9 @@ async def test_admin_api_authorization_and_real_aggregation():
             "items"
         ]
         assert conversations[0]["conversation_id"] == "c1"
+        daily = client.get("/api/v1/admin/usage/daily", headers=auth)
+        assert daily.status_code == 200
+        assert daily.json()[0]["calls"] == 2
         future = client.get(
             "/api/v1/admin/usage/summary?date_from=2099-01-01T00:00:00Z", headers=auth
         ).json()

@@ -7,7 +7,8 @@ import time
 from datetime import UTC, datetime, timedelta
 from html import unescape
 
-from app.integrations.job_sources import ArbeitnowJobSource, JobSourceAdapter, RemotiveJobSource
+from app.core.config import settings
+from app.integrations.job_sources import AdzunaJobSource, JobSourceAdapter, JoobleJobSource
 from app.schemas.job import JobResult, JobSearchCriteria, JobSearchResponse
 
 logger = logging.getLogger(__name__)
@@ -17,10 +18,29 @@ HTML = re.compile(r"<[^>]+>")
 
 class JobSearchService:
     def __init__(self, sources: list[JobSourceAdapter] | None = None, cache_ttl: int = 180):
-        self.sources = sources or [RemotiveJobSource(), ArbeitnowJobSource()]
+        self.sources = sources if sources is not None else self._configured_sources()
         self.cache_ttl = cache_ttl
         self._cache: dict[str, tuple[float, JobSearchResponse]] = {}
         self._details: dict[tuple[str, str], JobResult] = {}
+
+    @staticmethod
+    def _configured_sources() -> list[JobSourceAdapter]:
+        sources: list[JobSourceAdapter] = []
+        if settings.ADZUNA_APP_ID and settings.ADZUNA_APP_KEY:
+            sources.append(
+                AdzunaJobSource(
+                    settings.ADZUNA_APP_ID,
+                    settings.ADZUNA_APP_KEY,
+                    settings.ADZUNA_COUNTRY,
+                )
+            )
+        else:
+            logger.info("Skipping Adzuna: ADZUNA_APP_ID/ADZUNA_APP_KEY not configured")
+        if settings.JOOBLE_API_KEY:
+            sources.append(JoobleJobSource(settings.JOOBLE_API_KEY))
+        else:
+            logger.info("Skipping Jooble: JOOBLE_API_KEY not configured")
+        return sources
 
     async def search(
         self, criteria: JobSearchCriteria, profile_skills: list[str] | None = None
@@ -42,6 +62,9 @@ class JobSearchService:
                 failures.append(source.name)
             else:
                 jobs.extend(outcome)
+        for job in jobs:
+            job.posted_at = _utc(job.posted_at)
+            job.expires_at = _utc(job.expires_at)
         jobs = self._deduplicate(self._filter(jobs, criteria), authority)
         jobs = [self._score(job, criteria, profile_skills or []) for job in jobs if not job.expired]
         jobs.sort(
@@ -60,7 +83,9 @@ class JobSearchService:
             result_count=len(jobs),
             source_failures=failures,
             message=(
-                f"{len(jobs)} jobs found. {len(failures)} source was unavailable."
+                "No job providers are configured. Add Adzuna or Jooble API credentials."
+                if not self.sources
+                else f"{len(jobs)} jobs found. {len(failures)} source was unavailable."
                 if failures
                 else None
             ),
@@ -73,7 +98,7 @@ class JobSearchService:
 
     @staticmethod
     def _filter(jobs, criteria):
-        query = set(_tokens(criteria.query)) | {s.casefold() for s in criteria.skills}
+        query = set(_tokens(criteria.query))
         cutoff = {"24h": 1, "7d": 7, "30d": 30}.get(criteria.date_posted or "")
         result = []
         for job in jobs:
@@ -111,13 +136,15 @@ class JobSearchService:
     def _deduplicate(jobs, authority):
         chosen = {}
         for job in jobs:
-            url_key = str(job.apply_url).rstrip("/").casefold()
             semantic = "|".join(
                 _normalize(x) for x in (job.company, job.title, job.location or "remote")
             )
-            key = url_key if url_key in chosen else semantic
+            key = semantic or str(job.apply_url).rstrip("/").casefold()
             current = chosen.get(key)
-            if not current or authority.get(job.source, 0) > authority.get(current.source, 0):
+            if not current or (_completeness(job), authority.get(job.source, 0)) > (
+                _completeness(current),
+                authority.get(current.source, 0),
+            ):
                 chosen[key] = job
         return list(chosen.values())
 
@@ -138,6 +165,12 @@ class JobSearchService:
         if criteria.workplace_type and job.workplace_type == criteria.workplace_type:
             score = min(100, score + 10)
             reasons.append(f"{job.workplace_type.title()} matches your preference")
+        if criteria.location and criteria.location.casefold() in (job.location or "").casefold():
+            score = min(100, score + 10)
+            reasons.append(f"{criteria.location} matches your location preference")
+        if criteria.experience_level and criteria.experience_level.casefold() in text:
+            score = min(100, score + 8)
+            reasons.append(f"{criteria.experience_level.title()} matches your career level")
         job.relevance_score = score
         job.matched_skills = matched
         job.skill_gaps = sorted(advertised, key=str.casefold)[:5]
@@ -155,3 +188,26 @@ def _tokens(value):
 
 def _normalize(value):
     return "".join(_tokens(value))
+
+
+def _completeness(job: JobResult) -> int:
+    values = (
+        job.description,
+        job.location,
+        job.country,
+        job.employment_type,
+        job.posted_at,
+        job.salary_min,
+        job.salary_max,
+        job.salary_currency,
+    )
+    return sum(value is not None and value != "" for value in values)
+
+
+def _utc(value: datetime | None) -> datetime | None:
+    """Normalize mixed provider timestamps before filtering and sorting."""
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value.astimezone(UTC)
