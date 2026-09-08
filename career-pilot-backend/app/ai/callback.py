@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 
 from langchain_core.callbacks import AsyncCallbackHandler
 
@@ -21,7 +22,12 @@ class UsageTrackingCallback(AsyncCallbackHandler):
         ) or self.configured_model
         try:
             await AIUsageService().record(
-                current_ai_context(), self.agent_name, model, self.provider, extract_usage(response)
+                current_ai_context(),
+                self.agent_name,
+                model,
+                self.provider,
+                extract_usage(response),
+                llm_call_id=str(kwargs.get("run_id") or uuid4()),
             )
         except Exception:
             # Accounting is fail-open for the user response, but never silent operationally.
@@ -39,6 +45,7 @@ class UsageTrackingCallback(AsyncCallbackHandler):
                 self.provider,
                 None,
                 status_override="failed_llm_request",
+                llm_call_id=str(kwargs.get("run_id") or uuid4()),
             )
         except Exception:
             logger.critical(

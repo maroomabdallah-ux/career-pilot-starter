@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import ForeignKey, Index, Integer, Numeric, String
+from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -13,6 +13,7 @@ from app.models.base import UUIDTimestampMixin
 class AIUsage(UUIDTimestampMixin, Base):
     __tablename__ = "ai_usage"
     __table_args__ = (
+        UniqueConstraint("user_id", "llm_call_id", name="uq_ai_usage_user_call"),
         Index("ix_ai_usage_user_created", "user_id", "created_at"),
         Index("ix_ai_usage_request_id", "request_id"),
         Index("ix_ai_usage_conversation_id", "conversation_id"),
@@ -24,6 +25,7 @@ class AIUsage(UUIDTimestampMixin, Base):
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     conversation_id: Mapped[str | None] = mapped_column(String(128))
     request_id: Mapped[str] = mapped_column(String(64))
+    llm_call_id: Mapped[str] = mapped_column(String(128), default=lambda: uuid4().hex)
     agent_name: Mapped[str] = mapped_column(String(80))
     model: Mapped[str] = mapped_column(String(120))
     provider: Mapped[str] = mapped_column(String(50))

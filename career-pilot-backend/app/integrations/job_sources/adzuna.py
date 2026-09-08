@@ -6,7 +6,7 @@ from app.integrations.job_sources.base import JobSourceAdapter
 from app.schemas.job import JobResult, JobSearchCriteria
 
 
-class AdzunaJobSource(JobSourceAdapter):
+class AdzunaJobProvider(JobSourceAdapter):
     name = "Adzuna"
     authority = 30
     base_url = "https://api.adzuna.com/v1/api/jobs"
@@ -66,6 +66,9 @@ def _normalize(row: dict, retrieved_at: datetime) -> JobResult | None:
         source_url=link,
         title=row["title"],
         company=company,
+        company_logo=(row.get("company") or {}).get("logo"),
+        via="Adzuna",
+        apply_options=[{"title": "Adzuna", "link": link}],
         location=location,
         country=str(area[0]) if area else None,
         workplace_type=_workplace(row, location),
@@ -89,3 +92,6 @@ def _employment(row: dict) -> str | None:
     time = str(row.get("contract_time") or "").replace("_", "-")
     kind = str(row.get("contract_type") or "").replace("_", "-")
     return time or kind or None
+
+
+AdzunaJobSource = AdzunaJobProvider

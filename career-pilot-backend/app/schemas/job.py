@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, computed_field, field_validator
 
 WorkplaceType = Literal["remote", "hybrid", "on-site", "unknown"]
 
@@ -17,6 +17,7 @@ class JobSearchCriteria(BaseModel):
     date_posted: Literal["24h", "7d", "30d"] | None = None
     skills: list[str] = Field(default_factory=list, max_length=25)
     limit: int = Field(default=20, ge=1, le=50)
+    page_token: str | None = Field(default=None, max_length=2048)
 
     @field_validator("query", "location", "country", "employment_type", "experience_level")
     @classmethod
@@ -25,12 +26,15 @@ class JobSearchCriteria(BaseModel):
 
 
 class JobResult(BaseModel):
+    match_score: int | None = Field(default=None, ge=0, le=100)
     external_id: str
     source: str
     source_url: HttpUrl
     title: str
     company: str
     company_logo: HttpUrl | None = None
+    via: str | None = None
+    apply_options: list[dict[str, str]] = Field(default_factory=list)
     location: str | None = None
     country: str | None = None
     workplace_type: WorkplaceType = "unknown"
@@ -52,6 +56,20 @@ class JobResult(BaseModel):
     fit_reasons: list[str] = Field(default_factory=list)
     expired: bool = False
 
+    @computed_field
+    @property
+    def id(self) -> str:
+        return self.external_id
+
+    @computed_field
+    @property
+    def salary(self) -> str | None:
+        if self.salary_min is None and self.salary_max is None:
+            return None
+        values = [self.salary_min, self.salary_max]
+        amount = " – ".join(f"{value:,.0f}" for value in values if value is not None)
+        return f"{amount} {self.salary_currency or ''}".strip()
+
 
 class JobSearchResponse(BaseModel):
     criteria: JobSearchCriteria
@@ -59,6 +77,21 @@ class JobSearchResponse(BaseModel):
     result_count: int
     source_failures: list[str] = Field(default_factory=list)
     message: str | None = None
+    next_page_token: str | None = None
+
+
+class PaginatedJobSearchResponse(BaseModel):
+    jobs: list[JobResult]
+    page: int
+    page_size: int
+    has_next: bool
+    has_previous: bool
+    source_failures: list[str] = Field(default_factory=list)
+    message: str | None = None
+    total_pages: int = 1
+    context_sources: list[str] = Field(default_factory=list)
+    search_query: str = ""
+    search_location: str = ""
 
 
 class JobSearchRequest(BaseModel):

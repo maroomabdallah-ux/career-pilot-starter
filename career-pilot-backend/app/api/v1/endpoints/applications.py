@@ -1,0 +1,53 @@
+from uuid import UUID
+
+from fastapi import APIRouter
+
+from app.api.dependencies import CurrentUser, SessionDep
+from app.api.idempotency import IdempotentRoute
+from app.schemas.application import (
+    ApplicationApprove,
+    ApplicationCreate,
+    ApplicationPrepare,
+    ApplicationResponse,
+    ApplicationTrack,
+)
+from app.services.applications import ApplicationService
+
+router = APIRouter(route_class=IdempotentRoute)
+
+
+@router.get("", response_model=list[ApplicationResponse])
+async def list_applications(session: SessionDep, user: CurrentUser):
+    return await ApplicationService(session, user).list()
+
+
+@router.post("", response_model=ApplicationResponse)
+async def create_application(data: ApplicationCreate, session: SessionDep, user: CurrentUser):
+    return await ApplicationService(session, user).create(data.job)
+
+
+@router.get("/{application_id}", response_model=ApplicationResponse)
+async def get_application(application_id: UUID, session: SessionDep, user: CurrentUser):
+    service = ApplicationService(session, user)
+    return await service.response(await service.get(application_id))
+
+
+@router.post("/{application_id}/prepare", response_model=ApplicationResponse)
+async def prepare_application(
+    application_id: UUID, data: ApplicationPrepare, session: SessionDep, user: CurrentUser
+):
+    return await ApplicationService(session, user).prepare(application_id, data)
+
+
+@router.post("/{application_id}/approve", response_model=ApplicationResponse)
+async def approve_application(
+    application_id: UUID, data: ApplicationApprove, session: SessionDep, user: CurrentUser
+):
+    return await ApplicationService(session, user).approve(application_id, data)
+
+
+@router.post("/{application_id}/track", response_model=ApplicationResponse)
+async def track_application(
+    application_id: UUID, data: ApplicationTrack, session: SessionDep, user: CurrentUser
+):
+    return await ApplicationService(session, user).track(application_id, data)

@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     ADZUNA_APP_KEY: str | None = None
     ADZUNA_COUNTRY: str = "gb"
     JOOBLE_API_KEY: str | None = None
+    SERPAPI_API_KEY: str | None = None
+    AI_USAGE_OUTBOX_DIR: str = ".ai-usage-outbox"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 

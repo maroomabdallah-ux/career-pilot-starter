@@ -15,7 +15,8 @@ class AIRequestCorrelationMiddleware(BaseHTTPMiddleware):
         token = request_id_var.set(request_id)
         try:
             response = await call_next(request)
-            response.headers["X-Request-ID"] = request_id
+            if "X-Request-ID" not in response.headers:
+                response.headers["X-Request-ID"] = request_id
             return response
         finally:
             request_id_var.reset(token)

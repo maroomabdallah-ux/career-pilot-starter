@@ -1,10 +1,11 @@
 import logging
+from uuid import uuid4
 
 from app.ai.context import AIContext
 from app.ai.cost import calculate_cost
 from app.ai.pricing import pricing_for
 from app.ai.usage import ProviderUsage
-from app.db.session import AsyncSessionLocal
+from app.ai.usage_outbox import persist_usage
 from app.models.ai_usage import AIUsage
 
 logger = logging.getLogger(__name__)
@@ -19,6 +20,7 @@ class AIUsageService:
         provider: str,
         usage: ProviderUsage | None,
         status_override: str | None = None,
+        llm_call_id: str | None = None,
     ):
         if not context.user_id:
             logger.critical(
@@ -42,6 +44,7 @@ class AIUsageService:
             user_id=context.user_id,
             conversation_id=context.conversation_id,
             request_id=context.request_id,
+            llm_call_id=llm_call_id or uuid4().hex,
             agent_name=agent_name,
             model=model,
             provider=provider,
@@ -55,8 +58,4 @@ class AIUsageService:
             total_cost=costs.total_cost if costs else None,
             pricing_status=status,
         )
-        async with AsyncSessionLocal() as session:
-            session.add(item)
-            await session.commit()
-            await session.refresh(item)
-        return item
+        return await persist_usage(item)

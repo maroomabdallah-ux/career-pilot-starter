@@ -28,19 +28,22 @@ from app.services.user import UserService
 def test_models_and_relationships_configure():
     configure_mappers()
     assert set(Base.metadata.tables) == {
+        "job_applications",
+        "application_events",
+        "idempotent_requests",
         "auth_sessions",
         "ai_usage",
         "users",
-            "career_profiles",
-            "career_knowledge_documents",
-            "career_knowledge_chunks",
-            "education",
+        "career_profiles",
+        "career_knowledge_documents",
+        "career_knowledge_chunks",
+        "education",
         "experiences",
         "job_search_history",
-            "projects",
+        "projects",
         "resumes",
         "saved_jobs",
-            "skills",
+        "skills",
     }
     profile = Base.metadata.tables["career_profiles"]
     assert profile.c.user_id.unique

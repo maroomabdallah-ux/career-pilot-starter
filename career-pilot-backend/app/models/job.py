@@ -20,7 +20,7 @@ class SavedJob(UUIDTimestampMixin, Base):
     __table_args__ = (UniqueConstraint("user_id", "source", "external_job_id"),)
     user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     source: Mapped[str] = mapped_column(String(60))
-    external_job_id: Mapped[str] = mapped_column(String(255))
+    external_job_id: Mapped[str] = mapped_column(Text)
     title: Mapped[str] = mapped_column(String(300))
     company: Mapped[str] = mapped_column(String(250))
     location: Mapped[str | None] = mapped_column(String(250))

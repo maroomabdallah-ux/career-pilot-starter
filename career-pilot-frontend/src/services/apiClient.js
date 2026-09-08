@@ -42,6 +42,11 @@ export const configureAuthClient = ({ getToken, setToken, sessionLost }) => {
 };
 
 apiClient.interceptors.request.use((config) => {
+  const protectedAction = /^\/(applications|resumes|ai\/profile)(\/|$)/.test(config.url || "");
+  if (protectedAction && ["post", "patch", "delete"].includes(config.method)) {
+    config.headers = AxiosHeaders.from(config.headers);
+    if (!config.headers.has("Idempotency-Key")) config.headers.set("Idempotency-Key", crypto.randomUUID());
+  }
   const token = typeof accessToken === "function" ? accessToken() : null;
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
@@ -49,6 +54,11 @@ apiClient.interceptors.request.use((config) => {
 
 apiClient.interceptors.response.use(undefined, async (error) => {
   const original = error.config;
+  // One transport retry retains the operation key; the server replays or reports processing.
+  if (!error.response && original && !original._transportRetried &&
+      AxiosHeaders.from(original.headers).has("Idempotency-Key") && error.code !== "ERR_CANCELED") {
+    return apiClient({ ...original, _transportRetried: true });
+  }
   if (error.response?.status !== 401 || original?._retried || original?.url?.includes("/auth/")) throw error;
   // Axios has already serialized a JSON request by this point. Keep that exact
   // body for the retry instead of rebuilding it after the asynchronous refresh.

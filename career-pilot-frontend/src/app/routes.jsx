@@ -11,6 +11,7 @@ import AdminAIUsagePage from "../pages/AdminAIUsagePage";
 import DashboardPage from "../pages/DashboardPage";
 import LandingPage from "../pages/LandingPage";
 import JobsPage from "../pages/JobsPage";
+import ApplicationsPage from "../pages/ApplicationsPage";
 import OnboardingPage from "../pages/OnboardingPage";
 import PlaceholderPage from "../pages/PlaceholderPage";
 import ProfilePage from "../pages/ProfilePage";
@@ -41,10 +42,12 @@ export default function AppRoutes() {
             <Route path="resume/templates" element={<ResumeTemplatesPage />} />
             <Route path="resume/:resumeId/edit" element={<ResumePage />} />
             <Route path="jobs" element={<JobsPage />} />
+            <Route path="applications" element={<ApplicationsPage />} />
+            <Route path="applications/:applicationId" element={<ApplicationsPage />} />
             <Route element={<AdminRoute />}>
               <Route path="admin/ai-usage" element={<AdminAIUsagePage />} />
             </Route>
-            {["applications", "interview", "roadmap", "billing"].map((path) => (
+            {["interview", "roadmap", "billing"].map((path) => (
               <Route key={path} path={path} element={<PlaceholderPage />} />
             ))}
           </Route>

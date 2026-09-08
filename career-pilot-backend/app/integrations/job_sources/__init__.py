@@ -1,7 +1,18 @@
-from app.integrations.job_sources.adzuna import AdzunaJobSource
-from app.integrations.job_sources.base import JobSourceAdapter
+from app.integrations.job_sources.adzuna import AdzunaJobProvider, AdzunaJobSource
+from app.integrations.job_sources.base import JobProvider, JobProviderResult, JobSourceAdapter
 from app.integrations.job_sources.greenhouse import GreenhouseJobSource
 from app.integrations.job_sources.jooble import JoobleJobSource
 from app.integrations.job_sources.lever import LeverJobSource
+from app.integrations.job_sources.serpapi import SerpApiJobProvider
 
-__all__ = ["AdzunaJobSource", "GreenhouseJobSource", "JobSourceAdapter", "JoobleJobSource", "LeverJobSource"]
+__all__ = [
+    "AdzunaJobSource",
+    "AdzunaJobProvider",
+    "GreenhouseJobSource",
+    "JobProvider",
+    "JobProviderResult",
+    "JobSourceAdapter",
+    "JoobleJobSource",
+    "LeverJobSource",
+    "SerpApiJobProvider",
+]

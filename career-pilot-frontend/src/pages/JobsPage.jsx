@@ -1,26 +1,85 @@
-import { Bookmark, BookmarkCheck, BriefcaseBusiness, Building2, CalendarDays, ExternalLink, MapPin, Search, Sparkles, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import AsyncState from "../components/common/AsyncState";
-import { apiErrorMessage, careerApi } from "../services/careerApi";
-
-const clean = (value = "") => value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-const age = (value) => value ? new Intl.RelativeTimeFormat("en", { numeric: "auto" }).format(-Math.max(0, Math.floor((Date.now() - new Date(value)) / 86400000)), "day") : "Date unavailable";
-
-function JobCard({ job, saved, onOpen, onSave }) {
-  return <article className="job-card"><div className="job-card-top"><div className="job-company-mark">{job.company?.slice(0, 1)}</div><div><span>{job.source}</span><h3>{job.title}</h3><p><Building2 size={14}/>{job.company}</p></div><button className="job-save" onClick={() => onSave(job, saved)} aria-label={saved ? "Unsave job" : "Save job"}>{saved ? <BookmarkCheck size={19}/> : <Bookmark size={19}/>}</button></div><div className="job-meta"><span><MapPin size={14}/>{job.location || "Location unavailable"}</span><span><BriefcaseBusiness size={14}/>{job.workplace_type}</span><span><CalendarDays size={14}/>{age(job.posted_at)}</span></div><div className="job-tags">{job.skills?.slice(0, 5).map(skill => <span key={skill}>{skill}</span>)}</div><div className="job-insight"><strong><Sparkles size={14}/> Why this may fit</strong><p>{job.fit_reasons?.[0] || "Relevant to your current search criteria."}</p>{!!job.skill_gaps?.length && <small>Potential gap: {job.skill_gaps.slice(0, 3).join(", ")}</small>}</div><button className="button secondary job-view" onClick={() => onOpen(job)}>View job</button></article>;
-}
-
-function JobDetails({ job, saved, onClose, onSave }) {
-  if (!job) return null;
-  return <div className="job-detail-backdrop" onMouseDown={onClose}><aside className="job-detail" onMouseDown={e => e.stopPropagation()}><button className="icon-button job-detail-close" onClick={onClose}><X size={18}/></button><span className="section-eyebrow">{job.source} · Original source retained</span><h2>{job.title}</h2><h3>{job.company}</h3><div className="job-meta"><span><MapPin size={14}/>{job.location || "Unavailable"}</span><span>{job.workplace_type}</span><span>{job.employment_type || "Type unavailable"}</span></div><section><h4>CareerPilot insight</h4>{job.fit_reasons?.map(x => <p className="fit" key={x}>✓ {x}</p>)}{!!job.skill_gaps?.length && <p className="gap">Potential gaps: {job.skill_gaps.join(", ")}</p>}</section><section><h4>Description</h4><p>{clean(job.description) || "Description unavailable from this source."}</p></section><div className="job-detail-actions"><button className="button secondary" onClick={() => onSave(job, saved)}>{saved ? "Unsave job" : "Save job"}</button><a className="button primary" href={job.apply_url} target="_blank" rel="noreferrer">Open original posting <ExternalLink size={15}/></a></div><button className="button secondary" disabled>Tailor resume · Coming next</button></aside></div>;
-}
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, Bookmark, Search, MapPin, Sparkles, SlidersHorizontal, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
+import { careerApi, apiErrorMessage } from "../services/careerApi";
+import { JobCard, JobDetails, jobKey } from "../features/jobs/JobComponents";
+import "../features/jobs/workspace.css";
 
 export default function JobsPage() {
-  const [query, setQuery] = useState(""); const [location, setLocation] = useState(""); const [workplace, setWorkplace] = useState(""); const [level, setLevel] = useState(""); const [datePosted, setDatePosted] = useState(""); const [employment, setEmployment] = useState(""); const [jobs, setJobs] = useState([]); const [saved, setSaved] = useState([]); const [profile, setProfile] = useState(null); const [selected, setSelected] = useState(null); const [loading, setLoading] = useState(false); const [error, setError] = useState(null); const [message, setMessage] = useState("");
-  useEffect(() => { Promise.all([careerApi.getProfile(), careerApi.listSavedJobs()]).then(([p,s]) => {setProfile(p);setSaved(s)}).catch(setError); }, []);
-  const suggestions = useMemo(() => [...new Set([...(profile?.target_roles || []), profile?.professional_title, ...(profile?.skills || []).slice(0, 1).map(s => `${s.name} Developer`)].filter(Boolean))].slice(0, 4), [profile]);
-  const savedFor = job => saved.find(x => x.source === job.source && x.external_job_id === job.external_id);
-  const search = async e => { e?.preventDefault(); setLoading(true); setError(null); setMessage(""); try { const criteria = { query: query || suggestions[0], location: location || null, workplace_type: workplace || null, experience_level: level || null, date_posted: datePosted || null, employment_type: employment || null, limit: 24 }; const response = await careerApi.searchJobs({ criteria }); setJobs(response.jobs); setMessage(response.message || `${response.result_count} opportunities found for your profile.`); } catch (err) { setError(err); } finally { setLoading(false); }};
-  const toggleSave = async (job, current) => { try { if (current) { await careerApi.unsaveJob(current.id); setSaved(x => x.filter(y => y.id !== current.id)); } else { const item = await careerApi.saveJob(job); setSaved(x => [item, ...x]); } } catch (err) { setError(err); }};
-  return <main className="page jobs-page"><section className="jobs-hero"><span className="section-eyebrow">Profile-aware opportunity search</span><h1>Find your next opportunity</h1><p>CareerPilot compares real listings with the verified skills and direction in your Career Profile.</p><form onSubmit={search} className="job-search-bar"><label><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Backend Developer or دورلي على شغل backend remote"/></label><label><MapPin size={18}/><input value={location} onChange={e=>setLocation(e.target.value)} placeholder="Amman / Remote"/></label><button className="button primary" disabled={loading || (!query && !suggestions[0])}>{loading ? "Searching…" : "Search jobs"}</button></form><div className="job-filters"><select value={workplace} onChange={e=>setWorkplace(e.target.value)}><option value="">Any workplace</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="on-site">On-site</option></select><select value={level} onChange={e=>setLevel(e.target.value)}><option value="">Any experience</option><option value="internship">Internship</option><option value="junior">Junior</option><option value="senior">Senior</option></select><select value={datePosted} onChange={e=>setDatePosted(e.target.value)}><option value="">Any date</option><option value="24h">Past 24 hours</option><option value="7d">Past week</option><option value="30d">Past month</option></select><select value={employment} onChange={e=>setEmployment(e.target.value)}><option value="">Any employment</option><option value="full-time">Full-time</option><option value="part-time">Part-time</option><option value="contract">Contract</option></select></div></section>{!jobs.length && !loading && <section className="job-suggestions"><Sparkles size={20}/><div><h2>Search with your saved Profile</h2><p>Suggested from your real career direction—not generated placeholder jobs.</p><div>{suggestions.map(x=><button key={x} onClick={()=>setQuery(x)}>{x}</button>)}</div></div></section>}{message && <p className="jobs-message">{message}</p>}<AsyncState loading={loading} error={error ? { message: apiErrorMessage(error) } : null}>{!!jobs.length && <section className="job-results"><header><div><span className="section-eyebrow">Live opportunities</span><h2>{jobs.length} relevant jobs</h2></div><span>{saved.length} saved</span></header><div className="job-grid">{jobs.map(job=><JobCard key={`${job.source}:${job.external_id}`} job={job} saved={savedFor(job)} onOpen={setSelected} onSave={toggleSave}/>)}</div></section>}</AsyncState><JobDetails job={selected} saved={selected && savedFor(selected)} onClose={()=>setSelected(null)} onSave={toggleSave}/></main>;
+  const navigate = useNavigate();
+  const [tab, setTab] = useState("recommended");
+  const [feed, setFeed] = useState(null);
+  const [saved, setSaved] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [query, setQuery] = useState("");
+  const [location, setLocation] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [params, setParams] = useState({ page: 1, page_size: 10 });
+  const [filter, setFilter] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(null);
+  const [skipped, setSkipped] = useState(new Set());
+  const [savedPage, setSavedPage] = useState(1);
+  const actionLock = useRef(false);
+  const firstLoad = useRef(true);
+
+  useEffect(() => { careerApi.listSavedJobs().then(setSaved).catch(() => setNotice("Saved jobs could not be loaded. Refresh to try again.")); }, []);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true); setError(null); setSelected(null);
+    careerApi.searchJobsPage(params, controller.signal).then(result => {
+      setFeed(result);
+      if (firstLoad.current) { setLocation(result.search_location || ""); firstLoad.current = false; }
+    }).catch(err => { if (err.code !== "ERR_CANCELED") setError(err); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [params]);
+
+  const savedFor = job => saved.find(item => item.source === job.source && item.external_job_id === job.external_id);
+  const act = async (job, operation) => {
+    if (actionLock.current) return;
+    actionLock.current = true; setBusy(jobKey(job)); setNotice("");
+    try {
+      if (operation === "apply") {
+        const application = await careerApi.createApplication(job);
+        navigate(`/app/applications/${application.id}`);
+      } else {
+        const current = savedFor(job);
+        if (current) {
+          await careerApi.unsaveJob(current.id); setSaved(items => items.filter(x => x.id !== current.id));
+          setNotice("Removed from saved jobs.");
+        } else {
+          const item = await careerApi.saveJob(job);
+          setSaved(items => [...items.filter(x => x.id !== item.id), item]);
+          setNotice("Job saved. You can return to it anytime.");
+        }
+      }
+    } catch (err) { setNotice(apiErrorMessage(err)); }
+    finally { actionLock.current = false; setBusy(null); }
+  };
+  const search = event => {
+    event.preventDefault(); setTab("recommended"); setSkipped(new Set());
+    setParams({ q: query.trim(), location: location.trim(), page: 1, page_size: 10,
+      workplace_type: filter === "remote" ? "remote" : undefined,
+      employment_type: filter && filter !== "remote" ? filter : undefined });
+  };
+  const allSaved = saved.map(item => item.snapshot);
+  const savedPages = Math.max(1, Math.ceil(allSaved.length / 10));
+  const page = tab === "saved" ? Math.min(savedPage, savedPages) : (feed?.page || 1);
+  const jobs = tab === "saved" ? allSaved.slice((page - 1) * 10, page * 10) : (feed?.jobs || []);
+  const visible = jobs.filter(job => !skipped.has(jobKey(job)));
+  const pages = tab === "saved" ? savedPages : feed?.total_pages || 1;
+  const move = target => { setSelected(null); tab === "saved" ? setSavedPage(target) : setParams(old => ({ ...old, page: target })); };
+  const changeTab = value => { setTab(value); setSelected(null); };
+
+  return <main className="page cp-workspace"><header className="cp-page-header"><div><span className="cp-eyebrow"><Sparkles size={14}/> YOUR CAREER, IN FOCUS</span><h1>Find your next chapter<span>.</span></h1><p>Opportunities shaped around your experience, skills, and ambitions.</p></div><Link className="button secondary" to="/app/applications">My applications <ArrowRight size={16}/></Link></header>
+    <section className="cp-context-bar"><div className="cp-context-icon"><Sparkles size={21}/></div><div><strong>{feed?.context_sources?.length ? "Your career profile is guiding the search" : "Let’s find your next opportunity"}</strong><p>{feed?.context_sources?.length ? `Using ${feed.context_sources.join(" + ")} · ${feed.search_query || "Technology roles"}` : "Add skills or a resume to get more personal recommendations."}</p></div><span className="cp-location-pill"><MapPin size={14}/>{feed?.search_location || "Open to locations"}</span><Link to="/app/profile">Update profile <ArrowRight size={14}/></Link></section>
+    <div className="cp-toolbar"><div className="cp-tabs"><button className={tab === "recommended" ? "active" : ""} onClick={() => changeTab("recommended")}>For you</button><button className={tab === "saved" ? "active" : ""} onClick={() => changeTab("saved")}><Bookmark size={15}/> Saved <span>{saved.length}</span></button></div><button className="cp-filter-toggle" onClick={() => setFiltersOpen(x => !x)} aria-expanded={filtersOpen}><SlidersHorizontal size={16}/> Refine search</button></div>
+    {filtersOpen && <form className="cp-search-form" onSubmit={search}><label><Search size={17}/><input aria-label="Job title or keyword" value={query} onChange={e => setQuery(e.target.value)} placeholder={feed?.search_query || "Role or keyword (optional)"}/></label><label><MapPin size={17}/><input aria-label="Job location" value={location} onChange={e => setLocation(e.target.value)} placeholder="Location (optional)"/></label><select aria-label="Job type" value={filter} onChange={e => setFilter(e.target.value)}><option value="">All work types</option><option value="remote">Remote</option><option value="full-time">Full-time</option><option value="part-time">Part-time</option><option value="internship">Internship</option></select><button className="button primary" disabled={loading}>Find jobs</button><button type="button" className="cp-text-button" onClick={() => { setQuery(""); setLocation(""); setFilter(""); firstLoad.current = true; setParams({ page: 1, page_size: 10 }); }}>Use my preferences</button></form>}
+    {notice && <p className="cp-notice" role="status">{notice}</p>}
+    {tab === "recommended" && feed?.message && <p className="cp-small-note">{feed.message}</p>}
+    {tab === "recommended" && loading ? <div className="cp-loading" role="status"><RefreshCw className="spin" size={22}/><h2>Finding opportunities for you</h2><p>Checking real listings against your career profile…</p><div className="cp-skeleton"/><div className="cp-skeleton"/></div> : tab === "recommended" && error ? <div className="cp-empty"><h2>We couldn’t load your opportunities</h2><p>{apiErrorMessage(error)}</p><button className="button secondary" onClick={() => setParams(x => ({ ...x }))}>Try again</button></div> : <><div className="cp-results-heading"><div><h2>{tab === "saved" ? "Your saved opportunities" : "Recommended for you"}</h2><p>{tab === "saved" ? "Your shortlist, ready whenever you are." : "Best available matches first. Explore every role at your own pace."}</p></div><span>{visible.length} opportunities · Page {page}</span></div><div className={`cp-jobs-grid ${selected ? "has-selection" : ""}`}><section className="cp-job-list" aria-label="Job opportunities">{visible.map(job => <JobCard key={jobKey(job)} job={job} selected={selected && jobKey(selected) === jobKey(job)} saved={!!savedFor(job)} busy={!!busy} onView={() => setSelected(job)} onSave={() => act(job, "save")} onApply={() => act(job, "apply")} onSkip={tab === "recommended" ? () => { setSkipped(old => new Set([...old, jobKey(job)])); if (selected && jobKey(selected) === jobKey(job)) setSelected(null); } : undefined}/>)}{!visible.length && <div className="cp-empty"><Bookmark size={28}/><h2>{tab === "saved" ? "Build your shortlist" : "No opportunities in this view"}</h2><p>{tab === "saved" ? "Save a role from your recommendations to find it here later." : "Try another role or location, or restore jobs skipped during this visit."}</p>{skipped.size > 0 && <button className="button secondary" onClick={() => setSkipped(new Set())}>Restore skipped jobs</button>}</div>}</section><JobDetails job={selected} saved={selected && !!savedFor(selected)} busy={!!busy} onSave={() => act(selected, "save")} onApply={() => act(selected, "apply")} onClose={() => setSelected(null)}/></div><nav className="cp-pagination" aria-label="Job pages"><button disabled={page <= 1} onClick={() => move(page - 1)}><ChevronLeft size={16}/> Previous</button><span>{page} / {pages}</span><button disabled={page >= pages} onClick={() => move(page + 1)}>Next <ChevronRight size={16}/></button></nav></>}
+  </main>;
 }

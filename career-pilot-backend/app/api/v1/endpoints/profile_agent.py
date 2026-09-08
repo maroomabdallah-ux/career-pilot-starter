@@ -26,6 +26,7 @@ from app.agents.profile.service import (
 )
 from app.ai.context import ai_conversation
 from app.api.dependencies import AccessTokenDep, AIUser, CurrentUser
+from app.api.idempotency import IdempotentRoute
 from app.core.config import settings
 from app.graphs.profile_graph import profile_graph
 from app.mcp.clients.core_client import CareerPilotMCPClient
@@ -35,7 +36,7 @@ from app.schemas.experience import ExperienceCreate, ExperienceUpdate
 from app.schemas.project import ProjectCreate, ProjectUpdate
 from app.schemas.skill import SkillCreate, SkillUpdate
 
-router = APIRouter()
+router = APIRouter(route_class=IdempotentRoute)
 logger = logging.getLogger(__name__)
 WRITE = {
     ProfileIntent.ADD_PROFILE_INFORMATION: ("profile", "update"),

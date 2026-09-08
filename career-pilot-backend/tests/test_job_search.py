@@ -93,17 +93,16 @@ async def test_normalize_filter_deduplicate_relevance_and_source_fallback():
             workplace_type="remote",
             experience_level="junior",
             date_posted="7d",
-        ),
-        ["Python", "FastAPI"],
+        )
     )
     assert result.result_count == 1
     assert result.source_failures == ["Unavailable"]
     found = result.jobs[0]
     assert found.source == "DirectATS"
-    assert found.matched_skills == ["Python", "FastAPI"]
-    assert "Kubernetes" in found.skill_gaps
     assert found.salary_min is None and found.salary_max is None
-    assert not any("Kubernetes" in reason for reason in found.fit_reasons)
+    assert found.matched_skills == []
+    assert found.skill_gaps == []
+    assert found.fit_reasons == []
 
 
 @pytest.mark.asyncio
@@ -168,3 +167,11 @@ async def test_no_configured_sources_returns_actionable_message():
 
     assert result.jobs == []
     assert "No job providers are configured" in result.message
+
+
+@pytest.mark.asyncio
+async def test_all_provider_failures_raise_clean_service_error():
+    service = JobSearchService([Source("Unavailable", error=RuntimeError("secret detail"))])
+
+    with pytest.raises(RuntimeError, match="All configured job providers are unavailable"):
+        await service.search(JobSearchCriteria(query="Python"))

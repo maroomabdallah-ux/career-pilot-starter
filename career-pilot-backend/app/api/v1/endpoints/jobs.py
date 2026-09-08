@@ -3,19 +3,77 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, status
 
 from app.api.dependencies import AccessTokenDep, CurrentUser, SessionDep
-from app.graphs.job_search_graph import job_search_graph
+from app.graphs.job_search_graph import job_search_graph, recommendation_graph
 from app.mcp.clients.core_client import CareerPilotMCPClient
 from app.schemas.job import (
     JobResult,
     JobSearchRequest,
     JobSearchResponse,
+    PaginatedJobSearchResponse,
     SavedJobCreate,
     SavedJobResponse,
     SearchHistoryResponse,
 )
+from app.services.job_search import JobSearchService
 from app.services.jobs import SavedJobService
 
 router = APIRouter()
+direct_job_search = JobSearchService()
+DEFAULT_DISCOVERY_QUERY = (
+    "Software Engineer Backend Developer Full Stack Developer AI Engineer Data Analyst"
+)
+
+
+@router.get("/search", response_model=PaginatedJobSearchResponse)
+async def paginated_search_jobs(
+    session: SessionDep,
+    user: CurrentUser,
+    q: str = "",
+    location: str | None = None,
+    page: int = 1,
+    page_size: int = 10,
+    workplace_type: str | None = None,
+    employment_type: str | None = None,
+):
+    if page < 1 or page_size != 10:
+        raise HTTPException(422, "page must be at least 1 and page_size must be 10")
+    try:
+        state = await recommendation_graph.ainvoke(
+            {
+                "query": q,
+                "location": location,
+                "workplace_type": workplace_type,
+                "employment_type": employment_type,
+            },
+            config={
+                "configurable": {
+                    "session": session,
+                    "user_id": user.id,
+                    "job_service": direct_job_search,
+                }
+            },
+        )
+        result, criteria = state["result"], state["criteria"]
+    except Exception as exc:
+        raise HTTPException(502, "Unable to load jobs at the moment.") from exc
+    start = (page - 1) * page_size
+    jobs = result.jobs[start : start + page_size]
+    await SavedJobService(session, user.id).record_search(
+        criteria, len(jobs), sorted({job.source for job in jobs}), result.source_failures
+    )
+    return PaginatedJobSearchResponse(
+        jobs=jobs,
+        page=page,
+        page_size=page_size,
+        has_next=len(result.jobs) > start + page_size,
+        has_previous=page > 1,
+        source_failures=result.source_failures,
+        message=result.message,
+        total_pages=max(1, (len(result.jobs) + 9) // 10),
+        context_sources=state["context"].sources,
+        search_query=criteria.query,
+        search_location=criteria.location or "",
+    )
 
 
 @router.post("/search", response_model=JobSearchResponse)

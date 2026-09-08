@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from app.agents.resume.service import ResumeWritingService
 from app.ai.context import ai_conversation
 from app.api.dependencies import AccessTokenDep, AIUser, CurrentUser, SessionDep
+from app.api.idempotency import IdempotentRoute
 from app.graphs.resume_graph import ResumeGenerationStageError, resume_copilot_graph, resume_graph
 from app.mcp.clients.core_client import CareerPilotMCPClient
 from app.schemas.resume import (
@@ -28,7 +29,7 @@ from app.services.resume_intelligence import analyze_resume, apply_suggestion, v
 from app.services.resume_pdf import PDFRendererUnavailable, render_resume_pdf
 from app.services.resume_templates import TEMPLATES, TemplateAccessService
 
-router = APIRouter()
+router = APIRouter(route_class=IdempotentRoute)
 logger = logging.getLogger(__name__)
 
 
@@ -253,9 +254,7 @@ async def coach(
             with ai_conversation(str(resume_id)):
                 writings = await asyncio.gather(
                     *(
-                        ResumeWritingService().generate(
-                            verified, prompt, context.supporting_rag
-                        )
+                        ResumeWritingService().generate(verified, prompt, context.supporting_rag)
                         for prompt in prompts
                     )
                 )

@@ -1,6 +1,8 @@
 from uuid import UUID
 
-from app.core.exceptions import ConflictError, NotFoundError
+from sqlalchemy.dialects.postgresql import insert
+
+from app.core.exceptions import NotFoundError
 from app.models.job import JobSearchHistory, SavedJob
 from app.repositories.job import JobRepository
 from app.schemas.job import JobResult, JobSearchCriteria
@@ -15,11 +17,10 @@ class SavedJobService:
         return await self.repository.list_saved(self.user_id)
 
     async def save(self, job: JobResult):
-        if await self.repository.find_saved(self.user_id, job.source, job.external_id):
-            raise ConflictError("This job is already saved")
         data = job.model_dump(mode="json")
-        return await self.repository.add(
-            SavedJob(
+        statement = (
+            insert(SavedJob)
+            .values(
                 user_id=self.user_id,
                 source=job.source,
                 external_job_id=job.external_id,
@@ -32,7 +33,12 @@ class SavedJobService:
                 source_url=str(job.source_url),
                 snapshot=data,
             )
+            .on_conflict_do_nothing(index_elements=["user_id", "source", "external_job_id"])
         )
+        session = self.repository.session
+        await session.execute(statement)
+        await session.commit()
+        return await self.repository.find_saved(self.user_id, job.source, job.external_id)
 
     async def unsave(self, item_id: UUID):
         item = await self.repository.get_saved(self.user_id, item_id)

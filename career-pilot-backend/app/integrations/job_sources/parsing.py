@@ -22,7 +22,7 @@ def extract_skills(value: str | None) -> list[str]:
 
 def _contains(text: str, skill: str) -> bool:
     token = re.escape(skill.casefold())
-    return bool(re.search(rf"(?<![\w+#.]){token}(?![\w+#.])", text))
+    return bool(re.search(rf"(?<![\w+#]){token}(?![\w+#])", text))
 
 
 def infer_experience_level(title: str, description: str | None = None) -> str | None:

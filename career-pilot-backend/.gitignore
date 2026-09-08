@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .env
+.ai-usage-outbox/
 .idea/
 .vscode/
 .DS_Store
