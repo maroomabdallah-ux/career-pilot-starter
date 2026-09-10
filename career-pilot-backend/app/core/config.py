@@ -1,3 +1,4 @@
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,8 +28,19 @@ class Settings(BaseSettings):
     ADZUNA_COUNTRY: str = "gb"
     JOOBLE_API_KEY: str | None = None
     SERPAPI_API_KEY: str | None = None
+    STRIPE_SECRET_KEY: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None
+    STRIPE_PRICE_ESSENTIAL: str | None = None
+    STRIPE_PRICE_PRO: str | None = None
     AI_USAGE_OUTBOX_DIR: str = ".ai-usage-outbox"
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def async_database_url(cls, value):
+        if isinstance(value, str) and value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return value
 
 
 settings = Settings()

@@ -4,6 +4,7 @@ import {
   Coins,
   Cpu,
   Database,
+  ChevronDown,
   Users,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -76,13 +77,6 @@ function Table({ tab, rows }) {
                 <strong>{name(row)}</strong>
                 {row.user_id && <small>{row.user_id}</small>}
               </td>
-              {tab === "model" && (
-                <td>
-                  {row.estimated_cache_savings == null
-                    ? "Unknown pricing"
-                    : money(row.estimated_cache_savings)}
-                </td>
-              )}
               {tab === "request" && <td>{row.agents?.join(", ")}</td>}
               <td>{number(row.llm_calls)}</td>
               <td>{number(row.total_tokens)}</td>
@@ -92,6 +86,13 @@ function Table({ tab, rows }) {
                   Number(row.total_cost || 0) / Math.max(row.llm_calls || 0, 1),
                 )}
               </td>
+              {tab === "model" && (
+                <td>
+                  {row.estimated_cache_savings == null
+                    ? "Unknown pricing"
+                    : money(row.estimated_cache_savings)}
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -129,6 +130,7 @@ export default function AdminAIUsagePage() {
   const [agentCosts, setAgentCosts] = useState([]);
   const [modelCosts, setModelCosts] = useState([]);
   const [tab, setTab] = useState("user");
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [filters, setFilters] = useState({
     date_from: "",
     date_to: "",
@@ -183,6 +185,8 @@ export default function AdminAIUsagePage() {
         ["Active AI users", number(summary.active_ai_users), Users],
       ]
     : [];
+  const primaryCards = cards.slice(0, 4);
+  const secondaryCards = cards.slice(4);
   return (
     <main className="page admin-usage-page">
       <header className="usage-header">
@@ -197,39 +201,49 @@ export default function AdminAIUsagePage() {
           Refresh data
         </button>
       </header>
-      <section className="usage-filters">
-        <input
-          type="date"
-          value={filters.date_from}
-          onChange={(e) =>
-            setFilters((x) => ({ ...x, date_from: e.target.value }))
-          }
-        />
-        <input
-          type="date"
-          value={filters.date_to}
-          onChange={(e) =>
-            setFilters((x) => ({ ...x, date_to: e.target.value }))
-          }
-        />
-        <input
-          placeholder="User UUID"
-          value={filters.user_id}
-          onChange={(e) =>
-            setFilters((x) => ({ ...x, user_id: e.target.value }))
-          }
-        />
-        <input
-          placeholder="Agent"
-          value={filters.agent}
-          onChange={(e) => setFilters((x) => ({ ...x, agent: e.target.value }))}
-        />
-        <input
-          placeholder="Model"
-          value={filters.model}
-          onChange={(e) => setFilters((x) => ({ ...x, model: e.target.value }))}
-        />
-      </section>
+      <details className="usage-filter-panel">
+        <summary>
+          Filters <span>Optional</span>
+          <ChevronDown size={16} />
+        </summary>
+        <section className="usage-filters">
+          <input
+            type="date"
+            value={filters.date_from}
+            onChange={(e) =>
+              setFilters((x) => ({ ...x, date_from: e.target.value }))
+            }
+          />
+          <input
+            type="date"
+            value={filters.date_to}
+            onChange={(e) =>
+              setFilters((x) => ({ ...x, date_to: e.target.value }))
+            }
+          />
+          <input
+            placeholder="User UUID"
+            value={filters.user_id}
+            onChange={(e) =>
+              setFilters((x) => ({ ...x, user_id: e.target.value }))
+            }
+          />
+          <input
+            placeholder="Agent"
+            value={filters.agent}
+            onChange={(e) =>
+              setFilters((x) => ({ ...x, agent: e.target.value }))
+            }
+          />
+          <input
+            placeholder="Model"
+            value={filters.model}
+            onChange={(e) =>
+              setFilters((x) => ({ ...x, model: e.target.value }))
+            }
+          />
+        </section>
+      </details>
       <AsyncState
         loading={loading}
         error={error ? { message: apiErrorMessage(error) } : null}
@@ -237,7 +251,7 @@ export default function AdminAIUsagePage() {
         {summary && (
           <>
             <section className="usage-kpis">
-              {cards.map(([label, value, Icon]) => (
+              {primaryCards.map(([label, value, Icon]) => (
                 <article key={label}>
                   <Icon size={17} />
                   <span>{label}</span>
@@ -245,6 +259,16 @@ export default function AdminAIUsagePage() {
                 </article>
               ))}
             </section>
+            <button
+              className="usage-details-toggle"
+              onClick={() => setDetailsOpen((value) => !value)}
+              aria-expanded={detailsOpen}
+            >
+              {detailsOpen
+                ? "Hide detailed analytics"
+                : "Show detailed analytics"}
+              <ChevronDown size={16} />
+            </button>
             {(summary.unknown_pricing_calls > 0 ||
               summary.missing_usage_calls > 0 ||
               summary.failed_llm_calls > 0) && (
@@ -260,55 +284,68 @@ export default function AdminAIUsagePage() {
                 </div>
               </div>
             )}
-            <section className="usage-charts">
-              <article>
-                <span>Daily AI cost</span>
-                <strong>{money(summary.total_cost)}</strong>
-                <Trend daily={daily} field="total_cost" color="#2f80ed" />
-              </article>
-              <article>
-                <span>Daily tokens</span>
-                <strong>{number(summary.total_tokens)}</strong>
-                <Trend daily={daily} field="total_tokens" color="#6d5bd0" />
-              </article>
-              <article>
-                <span>Calls per day</span>
-                <strong>{number(summary.llm_calls)}</strong>
-                <Trend daily={daily} field="calls" color="#23a37a" />
-              </article>
-            </section>
-            <section className="usage-cost-breakdown">
-              <CostBars
-                title="Cost by agent"
-                rows={agentCosts}
-                labelKey="agent_name"
-              />
-              <CostBars
-                title="Cost by model"
-                rows={modelCosts}
-                labelKey="model"
-              />
-            </section>
-            <section className="usage-breakdown">
-              <header>
-                <div>
-                  <span className="section-eyebrow">Usage breakdown</span>
-                  <h2>Accounting dimensions</h2>
-                </div>
-                <div className="usage-tabs">
-                  {tabs.map((x) => (
-                    <button
-                      className={tab === x ? "active" : ""}
-                      onClick={() => setTab(x)}
-                      key={x}
-                    >
-                      {x}s
-                    </button>
+            {detailsOpen && (
+              <div className="usage-details">
+                <section className="usage-kpis usage-kpis-secondary">
+                  {secondaryCards.map(([label, value, Icon]) => (
+                    <article key={label}>
+                      <Icon size={17} />
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </article>
                   ))}
-                </div>
-              </header>
-              <Table tab={tab} rows={rows} />
-            </section>
+                </section>
+                <section className="usage-charts">
+                  <article>
+                    <span>Daily AI cost</span>
+                    <strong>{money(summary.total_cost)}</strong>
+                    <Trend daily={daily} field="total_cost" color="#2f80ed" />
+                  </article>
+                  <article>
+                    <span>Daily tokens</span>
+                    <strong>{number(summary.total_tokens)}</strong>
+                    <Trend daily={daily} field="total_tokens" color="#6d5bd0" />
+                  </article>
+                  <article>
+                    <span>Calls per day</span>
+                    <strong>{number(summary.llm_calls)}</strong>
+                    <Trend daily={daily} field="calls" color="#23a37a" />
+                  </article>
+                </section>
+                <section className="usage-cost-breakdown">
+                  <CostBars
+                    title="Cost by agent"
+                    rows={agentCosts}
+                    labelKey="agent_name"
+                  />
+                  <CostBars
+                    title="Cost by model"
+                    rows={modelCosts}
+                    labelKey="model"
+                  />
+                </section>
+                <section className="usage-breakdown">
+                  <header>
+                    <div>
+                      <span className="section-eyebrow">Usage breakdown</span>
+                      <h2>Accounting dimensions</h2>
+                    </div>
+                    <div className="usage-tabs">
+                      {tabs.map((x) => (
+                        <button
+                          className={tab === x ? "active" : ""}
+                          onClick={() => setTab(x)}
+                          key={x}
+                        >
+                          {x}s
+                        </button>
+                      ))}
+                    </div>
+                  </header>
+                  <Table tab={tab} rows={rows} />
+                </section>
+              </div>
+            )}
           </>
         )}
       </AsyncState>

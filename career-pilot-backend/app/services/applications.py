@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -5,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert
 
 from app.core.exceptions import ConflictError, NotFoundError
 from app.models.application import ApplicationEvent, JobApplication
+from app.models.resume import Resume
 from app.repositories.career_profile import CareerProfileRepository
 from app.repositories.resume import ResumeRepository
 from app.schemas.application import ApplicationResponse
@@ -74,6 +76,106 @@ class ApplicationService:
         await self.session.commit()
         await self.session.refresh(item)
         return await self.response(item)
+
+    async def tailor(self, application_id, data):
+        item = await self.get(application_id, lock=True)
+        self.check_version(item, data.version)
+        if item.status not in {"draft", "ready_for_review"}:
+            raise ConflictError("Approved applications cannot be re-tailored.")
+        master = await ResumeRepository(self.session).get_for_user(self.user.id, data.resume_id)
+        if not master or master.status == "archived":
+            raise NotFoundError("Selected resume is unavailable")
+        content = deepcopy(master.content)
+        job_text = " ".join(
+            [item.job_snapshot.get("title", ""), item.job_snapshot.get("description", "")]
+        ).casefold()
+        for group in content.get("skill_groups", []):
+            group["items"] = sorted(
+                group.get("items", []), key=lambda skill: skill.casefold() not in job_text
+            )
+        content["section_order"] = [
+            section
+            for section in ("summary", "skills", "experience", "projects", "education")
+            if section in content.get("section_order", []) or content.get(section)
+        ]
+        version = await ResumeRepository(self.session).next_version(self.user.id)
+        tailored = Resume(
+            user_id=self.user.id,
+            title=f"{master.title} · {item.job_snapshot.get('company', 'Targeted')}",
+            document_type=master.document_type,
+            version=version,
+            status="draft",
+            template_id=master.template_id,
+            language=master.language,
+            content=content,
+            design=deepcopy(master.design),
+        )
+        self.session.add(tailored)
+        await self.session.flush()
+        item.resume_id = tailored.id
+        item.resume_snapshot = {
+            "title": tailored.title,
+            "content": content,
+            "template_id": tailored.template_id,
+            "tailored_from": str(master.id),
+        }
+        item.version += 1
+        self.event(item, "tailored", "A separate job-specific resume draft was created.")
+        await self.session.commit()
+        await self.session.refresh(item)
+        return await self.response(item)
+
+    async def generate_preparation(self, application_id, data):
+        item = await self.get(application_id, lock=True)
+        self.check_version(item, data.version)
+        job = item.job_snapshot
+        profile = await CareerProfileRepository(self.session).get_by_user_id(self.user.id)
+        missing = []
+        if not item.resume_id:
+            missing.append("Which resume would you like to use?")
+        if not profile or not profile.professional_summary:
+            missing.append("What relevant achievement should the cover letter emphasize?")
+        facts = list((job.get("matched_skills") or [])[:3])
+        evidence = f" My relevant experience includes {', '.join(facts)}." if facts else ""
+        item.cover_letter = (
+            f"Dear {job.get('company', 'Hiring Team')} Hiring Team,\n\n"
+            f"I am applying for the {job.get('title', 'open')} role.{evidence} "
+            "I would welcome the opportunity to discuss how my documented "
+            "experience can contribute.\n\n"
+            f"Sincerely,\n{self.user.first_name} {self.user.last_name}"
+        )
+        item.answers = [
+            {"question": question, "answer": data.user_context.get(question, "")}
+            for question in missing
+            if data.user_context.get(question)
+        ]
+        item.version += 1
+        self.event(item, "generated", "A grounded application preparation draft was generated.")
+        await self.session.commit()
+        await self.session.refresh(item)
+        return await self.response(item), [q for q in missing if not data.user_context.get(q)]
+
+    async def interview_kit(self, application_id):
+        item = await self.get(application_id)
+        job = item.job_snapshot
+        skills = (job.get("skills") or [])[:5]
+        return {
+            "questions": [
+                f"Why are you interested in the {job.get('title')} role at {job.get('company')}?",
+                "Tell me about a relevant challenge you solved and the measurable result.",
+                "Which requirement would stretch you most, and how would you close the gap?",
+            ],
+            "star_prompts": [
+                "Situation and context",
+                "Your specific task",
+                "Actions you took",
+                "Result and learning",
+            ],
+            "technical_topics": skills,
+            "grounding_note": (
+                "Questions use the saved job snapshot; answers must use user-confirmed facts."
+            ),
+        }
 
     @staticmethod
     def check_version(item, version):

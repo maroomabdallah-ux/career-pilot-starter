@@ -19,6 +19,28 @@ class ApplicationPrepare(BaseModel):
     application_url: HttpUrl | None = None
 
 
+class ApplicationTailor(BaseModel):
+    version: int = Field(ge=1)
+    resume_id: UUID
+
+
+class ApplicationGenerate(BaseModel):
+    version: int = Field(ge=1)
+    user_context: dict[str, str] = Field(default_factory=dict)
+
+
+class PreparationDraft(BaseModel):
+    application: "ApplicationResponse"
+    missing_information: list[str] = Field(default_factory=list)
+
+
+class InterviewKit(BaseModel):
+    questions: list[str]
+    star_prompts: list[str]
+    technical_topics: list[str]
+    grounding_note: str
+
+
 class ApplicationApprove(BaseModel):
     version: int = Field(ge=1)
     approved: Literal[True]
@@ -57,6 +79,9 @@ class ApplicationResponse(BaseModel):
     notes: str
     application_url: str
     method: str
+    apply_capability: Literal["api_apply", "browser_assisted", "manual_handoff"] = (
+        "manual_handoff"
+    )
     approved_at: datetime | None
     applied_at: datetime | None
     submission_evidence: str | None

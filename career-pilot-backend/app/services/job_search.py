@@ -10,10 +10,16 @@ from html import unescape
 from app.core.config import settings
 from app.integrations.job_sources import (
     AdzunaJobSource,
+    ArbeitnowJobSource,
+    GreenhouseJobSource,
     JobProvider,
     JobProviderResult,
+    JoobleJobSource,
+    LeverJobSource,
+    RemotiveJobSource,
     SerpApiJobProvider,
 )
+from app.integrations.job_sources.catalog import COMPANY_JOB_SOURCES
 from app.schemas.job import JobResult, JobSearchCriteria, JobSearchResponse
 
 logger = logging.getLogger(__name__)
@@ -30,7 +36,14 @@ class JobSearchService:
 
     @staticmethod
     def _configured_sources() -> list[JobProvider]:
-        sources: list[JobProvider] = []
+        # Public boards and company ATS feeds provide a real multi-source
+        # baseline even when no commercial provider keys are configured.
+        sources: list[JobProvider] = [ArbeitnowJobSource(), RemotiveJobSource()]
+        sources.extend(
+            GreenhouseJobSource(entry) if entry.provider == "greenhouse" else LeverJobSource(entry)
+            for entry in COMPANY_JOB_SOURCES
+            if entry.enabled
+        )
         if settings.SERPAPI_API_KEY:
             sources.append(SerpApiJobProvider(settings.SERPAPI_API_KEY))
         else:
@@ -45,6 +58,10 @@ class JobSearchService:
             )
         else:
             logger.info("Skipping Adzuna: ADZUNA_APP_ID/ADZUNA_APP_KEY not configured")
+        if settings.JOOBLE_API_KEY:
+            sources.append(JoobleJobSource(settings.JOOBLE_API_KEY))
+        else:
+            logger.info("Skipping Jooble: JOOBLE_API_KEY not configured")
         return sources
 
     async def search(
@@ -83,6 +100,7 @@ class JobSearchService:
             key=lambda job: job.posted_at or datetime.min.replace(tzinfo=UTC),
             reverse=True,
         )
+        jobs = self._diversify(jobs)
         jobs = jobs[: criteria.limit]
         for job in jobs:
             self._details[(job.source.casefold(), job.external_id)] = job
@@ -93,7 +111,7 @@ class JobSearchService:
             source_failures=failures,
             next_page_token=next_page_token,
             message=(
-                "No job providers are configured. Add a SerpApi API key."
+                "No job providers are configured."
                 if not self.sources
                 else f"{len(jobs)} jobs found. {len(failures)} source was unavailable."
                 if failures
@@ -117,11 +135,7 @@ class JobSearchService:
             ).casefold()
             if query and not query.intersection(_tokens(text)):
                 continue
-            if (
-                criteria.location
-                and criteria.location.casefold() not in text
-                and job.workplace_type != "remote"
-            ):
+            if criteria.location and not _location_matches(criteria.location, job.location):
                 continue
             if criteria.workplace_type and job.workplace_type != criteria.workplace_type:
                 continue
@@ -157,6 +171,20 @@ class JobSearchService:
             ):
                 chosen[key] = job
         return list(chosen.values())
+
+    @staticmethod
+    def _diversify(jobs: list[JobResult]) -> list[JobResult]:
+        """Interleave providers so one large feed cannot monopolize the first page."""
+        buckets: dict[str, list[JobResult]] = {}
+        for job in jobs:
+            buckets.setdefault(job.source, []).append(job)
+        result = []
+        while buckets:
+            for source in list(buckets):
+                result.append(buckets[source].pop(0))
+                if not buckets[source]:
+                    del buckets[source]
+        return result
 
     @staticmethod
     def _score(job, criteria, profile_skills):
@@ -212,6 +240,17 @@ def _completeness(job: JobResult) -> int:
         job.salary_currency,
     )
     return sum(value is not None and value != "" for value in values)
+
+
+def _location_matches(requested: str, offered: str | None) -> bool:
+    """Match place tokens while allowing explicitly worldwide remote roles."""
+    requested_tokens = set(_tokens(requested)) - {"the"}
+    offered_text = (offered or "").casefold()
+    if not requested_tokens:
+        return True
+    if any(marker in offered_text for marker in ("worldwide", "anywhere", "global")):
+        return True
+    return bool(requested_tokens & set(_tokens(offered_text)))
 
 
 def _utc(value: datetime | None) -> datetime | None:

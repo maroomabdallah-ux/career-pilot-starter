@@ -126,6 +126,32 @@ async def test_location_remote_and_experience_filters():
 
 
 @pytest.mark.asyncio
+async def test_location_does_not_leak_unrelated_remote_jobs():
+    rows = [
+        job(external_id="amman", location="Amman, Jordan"),
+        job(external_id="glasgow", location="Glasgow, Scotland"),
+        job(external_id="global", location="Worldwide"),
+    ]
+    result = await JobSearchService([Source("DirectATS", rows)]).search(
+        JobSearchCriteria(query="Python", location="Amman")
+    )
+
+    assert {item.external_id for item in result.jobs} == {"amman", "global"}
+
+
+def test_default_discovery_has_multiple_real_sources_without_paid_keys(monkeypatch):
+    monkeypatch.setattr("app.services.job_search.settings.SERPAPI_API_KEY", None)
+    monkeypatch.setattr("app.services.job_search.settings.ADZUNA_APP_ID", None)
+    monkeypatch.setattr("app.services.job_search.settings.ADZUNA_APP_KEY", None)
+    monkeypatch.setattr("app.services.job_search.settings.JOOBLE_API_KEY", None)
+
+    names = [source.name for source in JobSearchService._configured_sources()]
+
+    assert {"Arbeitnow", "Remotive", "Greenhouse", "Lever"}.issubset(names)
+    assert len(names) >= 4
+
+
+@pytest.mark.asyncio
 async def test_short_cache_avoids_repeating_identical_source_call():
     source = Source("DirectATS", [job()])
     calls = 0
@@ -142,6 +168,18 @@ async def test_short_cache_avoids_repeating_identical_source_call():
     await service.search(criteria)
     await service.search(criteria)
     assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_first_results_are_diversified_across_available_sources():
+    many = [job("LargeBoard", str(index)) for index in range(5)]
+    one = job("CompanyATS", "ats-1", company="Different Co")
+
+    result = await JobSearchService(
+        [Source("LargeBoard", many), Source("CompanyATS", [one])]
+    ).search(JobSearchCriteria(query="Python", limit=6))
+
+    assert {item.source for item in result.jobs[:2]} == {"LargeBoard", "CompanyATS"}
 
 
 @pytest.mark.asyncio

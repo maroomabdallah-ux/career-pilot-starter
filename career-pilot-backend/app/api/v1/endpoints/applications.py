@@ -7,9 +7,13 @@ from app.api.idempotency import IdempotentRoute
 from app.schemas.application import (
     ApplicationApprove,
     ApplicationCreate,
+    ApplicationGenerate,
     ApplicationPrepare,
     ApplicationResponse,
+    ApplicationTailor,
     ApplicationTrack,
+    InterviewKit,
+    PreparationDraft,
 )
 from app.services.applications import ApplicationService
 
@@ -24,6 +28,28 @@ async def list_applications(session: SessionDep, user: CurrentUser):
 @router.post("", response_model=ApplicationResponse)
 async def create_application(data: ApplicationCreate, session: SessionDep, user: CurrentUser):
     return await ApplicationService(session, user).create(data.job)
+
+
+@router.post("/{application_id}/tailor", response_model=ApplicationResponse)
+async def tailor_application(
+    application_id: UUID, data: ApplicationTailor, session: SessionDep, user: CurrentUser
+):
+    return await ApplicationService(session, user).tailor(application_id, data)
+
+
+@router.post("/{application_id}/generate", response_model=PreparationDraft)
+async def generate_application(
+    application_id: UUID, data: ApplicationGenerate, session: SessionDep, user: CurrentUser
+):
+    application, missing = await ApplicationService(session, user).generate_preparation(
+        application_id, data
+    )
+    return PreparationDraft(application=application, missing_information=missing)
+
+
+@router.get("/{application_id}/interview-kit", response_model=InterviewKit)
+async def interview_kit(application_id: UUID, session: SessionDep, user: CurrentUser):
+    return await ApplicationService(session, user).interview_kit(application_id)
 
 
 @router.get("/{application_id}", response_model=ApplicationResponse)

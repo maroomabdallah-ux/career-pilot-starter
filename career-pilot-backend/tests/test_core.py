@@ -43,8 +43,9 @@ def test_models_and_relationships_configure():
         "projects",
         "resumes",
         "saved_jobs",
-        "skills",
-    }
+            "skills",
+            "stripe_webhook_events",
+        }
     profile = Base.metadata.tables["career_profiles"]
     assert profile.c.user_id.unique
     assert Base.metadata.tables["skills"].constraints

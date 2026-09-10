@@ -11,6 +11,8 @@ import AdminAIUsagePage from "../pages/AdminAIUsagePage";
 import DashboardPage from "../pages/DashboardPage";
 import LandingPage from "../pages/LandingPage";
 import JobsPage from "../pages/JobsPage";
+import InterviewPage from "../pages/InterviewPage";
+import LegalPage from "../pages/LegalPage";
 import ApplicationsPage from "../pages/ApplicationsPage";
 import OnboardingPage from "../pages/OnboardingPage";
 import PlaceholderPage from "../pages/PlaceholderPage";
@@ -28,6 +30,8 @@ export default function AppRoutes() {
         <Route path="/login" element={<AuthPage mode="login" />} />
         <Route path="/signup" element={<AuthPage mode="signup" />} />
         <Route path="/admin/login" element={<AuthPage mode="admin" />} />
+        <Route path="/privacy" element={<LegalPage />} />
+        <Route path="/terms" element={<LegalPage />} />
       </Route>
       <Route element={<ProtectedRoute />}>
         <Route path="/onboarding" element={<OnboardingPage />} />
@@ -43,11 +47,15 @@ export default function AppRoutes() {
             <Route path="resume/:resumeId/edit" element={<ResumePage />} />
             <Route path="jobs" element={<JobsPage />} />
             <Route path="applications" element={<ApplicationsPage />} />
-            <Route path="applications/:applicationId" element={<ApplicationsPage />} />
+            <Route
+              path="applications/:applicationId"
+              element={<ApplicationsPage />}
+            />
+            <Route path="interview" element={<InterviewPage />} />
             <Route element={<AdminRoute />}>
               <Route path="admin/ai-usage" element={<AdminAIUsagePage />} />
             </Route>
-            {["interview", "roadmap", "billing"].map((path) => (
+            {["roadmap", "billing"].map((path) => (
               <Route key={path} path={path} element={<PlaceholderPage />} />
             ))}
           </Route>

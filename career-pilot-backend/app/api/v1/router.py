@@ -4,6 +4,7 @@ from app.api.v1.endpoints import (
     admin_usage,
     applications,
     auth,
+    billing,
     career_profiles,
     education,
     experiences,
@@ -22,6 +23,7 @@ from app.core.config import settings
 
 api_router = APIRouter()
 api_router.include_router(applications.router, prefix="/applications", tags=["applications"])
+api_router.include_router(billing.router, prefix="/billing", tags=["billing"])
 api_router.include_router(auth.router, prefix="/auth", tags=["auth"])
 api_router.include_router(me.router, prefix="/me", tags=["current user"])
 api_router.include_router(reference.router, prefix="/reference", tags=["reference data"])

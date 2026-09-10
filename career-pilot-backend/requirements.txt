@@ -25,6 +25,7 @@ langchain-mcp-adapters==0.3.2
 PyJWT>=2.10
 pwdlib[argon2]>=0.2
 cryptography==48.0.1
+stripe>=13,<15
 
 
 # Utilities

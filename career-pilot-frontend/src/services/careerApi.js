@@ -51,13 +51,23 @@ export const careerApi = {
   exportResume: (id) =>
     apiClient.post(`/resumes/${id}/export`, null, { responseType: "blob" }),
   searchJobs: (payload) => data(apiClient.post("/jobs/search", payload)),
-  searchJobsPage: (params, signal) => data(apiClient.get("/jobs/search", { params, signal })),
+  searchJobsPage: (params, signal) =>
+    data(apiClient.get("/jobs/search", { params, signal })),
   listApplications: () => data(apiClient.get("/applications")),
   getApplication: (id) => data(apiClient.get(`/applications/${id}`)),
   createApplication: (job) => data(apiClient.post("/applications", { job })),
-  prepareApplication: (id, payload) => data(apiClient.post(`/applications/${id}/prepare`, payload)),
-  approveApplication: (id, payload) => data(apiClient.post(`/applications/${id}/approve`, payload)),
-  trackApplication: (id, payload) => data(apiClient.post(`/applications/${id}/track`, payload)),
+  tailorApplication: (id, payload) =>
+    data(apiClient.post(`/applications/${id}/tailor`, payload)),
+  generateApplication: (id, payload) =>
+    data(apiClient.post(`/applications/${id}/generate`, payload)),
+  getInterviewKit: (id) =>
+    data(apiClient.get(`/applications/${id}/interview-kit`)),
+  prepareApplication: (id, payload) =>
+    data(apiClient.post(`/applications/${id}/prepare`, payload)),
+  approveApplication: (id, payload) =>
+    data(apiClient.post(`/applications/${id}/approve`, payload)),
+  trackApplication: (id, payload) =>
+    data(apiClient.post(`/applications/${id}/track`, payload)),
   listSavedJobs: () => data(apiClient.get("/jobs/saved")),
   saveJob: (job) => data(apiClient.post("/jobs/saved", { job })),
   unsaveJob: (id) => apiClient.delete(`/jobs/saved/${id}`),
