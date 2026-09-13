@@ -68,3 +68,7 @@ class SessionRevokedError(AuthenticationError):
 
 class ProfileAccessDeniedError(ApplicationError):
     detail = "You do not have access to this profile resource"
+
+
+class IncompleteCareerProfileError(ApplicationError):
+    detail = "Complete your profession, education, and skills before continuing"

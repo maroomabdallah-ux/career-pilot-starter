@@ -17,7 +17,7 @@ def signup(client: TestClient, label: str):
         "/api/v1/auth/signup",
         json={
             "email": f"{label}-{uuid4().hex}@example.com",
-            "password": "Career123",
+            "password": "Career123!",
             "first_name": label,
             "last_name": "Tester",
         },
@@ -76,7 +76,7 @@ def test_duplicate_email_invalid_login_and_invalid_token():
         email = f"duplicate-{uuid4().hex}@example.com"
         payload = {
             "email": email,
-            "password": "Career123",
+            "password": "Career123!",
             "first_name": "Test",
             "last_name": "User",
         }

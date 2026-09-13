@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.exceptions import (
     AuthenticationError,
     ConflictError,
+    IncompleteCareerProfileError,
     NotFoundError,
     ProfileAccessDeniedError,
 )
@@ -64,4 +65,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(
         ProfileAccessDeniedError,
         lambda _, exc: JSONResponse(status_code=403, content={"detail": exc.detail}),
+    )
+    app.add_exception_handler(
+        IncompleteCareerProfileError,
+        lambda _, exc: JSONResponse(status_code=422, content={"detail": exc.detail}),
     )

@@ -8,6 +8,9 @@ export const careerApi = {
   createProfile: (payload) => data(apiClient.post("/me/profile", payload)),
   updateProfile: (payload) => data(apiClient.patch("/me/profile", payload)),
   completeOnboarding: () => data(apiClient.post("/me/onboarding/complete")),
+  listEducation: () => data(apiClient.get("/me/education")),
+  listSkills: () => data(apiClient.get("/me/skills")),
+  listExperiences: () => data(apiClient.get("/me/experiences")),
   createChild: (resource, payload) =>
     data(apiClient.post(`/me/${resource}`, payload)),
   updateChild: (resource, id, payload) =>

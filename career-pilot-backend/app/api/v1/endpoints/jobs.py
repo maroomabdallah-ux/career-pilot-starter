@@ -1,3 +1,4 @@
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
@@ -19,9 +20,6 @@ from app.services.jobs import SavedJobService
 
 router = APIRouter()
 direct_job_search = JobSearchService()
-DEFAULT_DISCOVERY_QUERY = (
-    "Software Engineer Backend Developer Full Stack Developer AI Engineer Data Analyst"
-)
 
 
 @router.get("/search", response_model=PaginatedJobSearchResponse)
@@ -34,26 +32,43 @@ async def paginated_search_jobs(
     page_size: int = 10,
     workplace_type: str | None = None,
     employment_type: str | None = None,
+    mode: Literal["discover", "recommended"] = "recommended",
 ):
     if page < 1 or page_size != 10:
         raise HTTPException(422, "page must be at least 1 and page_size must be 10")
     try:
-        state = await recommendation_graph.ainvoke(
-            {
-                "query": q,
-                "location": location,
-                "workplace_type": workplace_type,
-                "employment_type": employment_type,
-            },
-            config={
-                "configurable": {
-                    "session": session,
-                    "user_id": user.id,
-                    "job_service": direct_job_search,
-                }
-            },
-        )
-        result, criteria = state["result"], state["criteria"]
+        if mode == "discover":
+            if not q.strip():
+                raise HTTPException(422, "Enter any occupation, industry, or keyword to search")
+            criteria = JobSearchCriteria(
+                query=q,
+                location=location or None,
+                workplace_type=workplace_type,
+                employment_type=employment_type,
+                limit=50,
+            )
+            result = await direct_job_search.search(criteria)
+            context_sources = []
+        else:
+            state = await recommendation_graph.ainvoke(
+                {
+                    "query": q,
+                    "location": location,
+                    "workplace_type": workplace_type,
+                    "employment_type": employment_type,
+                },
+                config={
+                    "configurable": {
+                        "session": session,
+                        "user_id": user.id,
+                        "job_service": direct_job_search,
+                    }
+                },
+            )
+            result, criteria = state["result"], state["criteria"]
+            context_sources = state["context"].sources
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(502, "Unable to load jobs at the moment.") from exc
     start = (page - 1) * page_size
@@ -70,7 +85,7 @@ async def paginated_search_jobs(
         source_failures=result.source_failures,
         message=result.message,
         total_pages=max(1, (len(result.jobs) + 9) // 10),
-        context_sources=state["context"].sources,
+        context_sources=context_sources,
         search_query=criteria.query,
         search_location=criteria.location or "",
     )

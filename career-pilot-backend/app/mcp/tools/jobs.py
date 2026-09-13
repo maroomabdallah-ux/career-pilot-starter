@@ -6,8 +6,6 @@ from app.mcp.context import run_tool
 from app.mcp.schemas import json_output
 from app.schemas.job import JobResult, JobSearchCriteria
 from app.services.job_search import JobSearchService
-from app.services.me import MeService
-from app.services.skill import SkillService
 
 job_search = JobSearchService()
 
@@ -15,13 +13,10 @@ job_search = JobSearchService()
 def register(server: FastMCP) -> None:
     @server.tool(structured_output=True)
     async def search_jobs(criteria: JobSearchCriteria) -> dict[str, Any]:
-        """Search configured real job sources for the authenticated user."""
+        """Broadly search configured real job sources using only the supplied criteria."""
 
-        async def operation(session, user):
-            skills = await MeService(session, user).list_children(
-                SkillService(session), "list_skills"
-            )
-            result = await job_search.search(criteria, [skill.name for skill in skills])
+        async def operation(_session, _user):
+            result = await job_search.search(criteria)
             return result.model_dump(mode="json")
 
         return await run_tool("search_jobs", operation)

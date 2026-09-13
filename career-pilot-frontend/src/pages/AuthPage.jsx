@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, EyeOff, LoaderCircle } from "lucide-react";
+import { CircleCheck, CircleX, Eye, EyeOff, LoaderCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
@@ -11,7 +11,8 @@ const password = z
   .string()
   .min(8, "Use at least 8 characters")
   .regex(/[A-Za-z]/, "Include a letter")
-  .regex(/\d/, "Include a number");
+  .regex(/\d/, "Include a number")
+  .regex(/[^A-Za-z0-9]/, "Include a symbol");
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
@@ -40,8 +41,22 @@ export default function AuthPage({ mode }) {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
-  } = useForm({ resolver: zodResolver(signup ? signupSchema : loginSchema) });
+  } = useForm({
+    resolver: zodResolver(signup ? signupSchema : loginSchema),
+    mode: "onChange",
+  });
+  const passwordValue = watch("password", "");
+  const confirmPasswordValue = watch("confirm_password", "");
+  const passwordRules = [
+    ["At least 8 characters", passwordValue.length >= 8],
+    ["Contains a letter", /[A-Za-z]/.test(passwordValue)],
+    ["Contains a number", /\d/.test(passwordValue)],
+    ["Contains a symbol", /[^A-Za-z0-9]/.test(passwordValue)],
+  ];
+  const confirmationMatches =
+    confirmPasswordValue.length > 0 && passwordValue === confirmPasswordValue;
   if (status === "authenticated" && (!admin || currentUser?.is_admin))
     return (
       <Navigate
@@ -160,6 +175,9 @@ export default function AuthPage({ mode }) {
                 <input
                   type={visible ? "text" : "password"}
                   autoComplete={signup ? "new-password" : "current-password"}
+                  aria-describedby={
+                    signup ? "password-requirements" : undefined
+                  }
                   {...register("password")}
                 />
                 <button
@@ -170,7 +188,31 @@ export default function AuthPage({ mode }) {
                   {visible ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <small className="field-error">{errors.password?.message}</small>
+              {signup ? (
+                <ul
+                  className="password-requirements"
+                  id="password-requirements"
+                  aria-label="Password requirements"
+                >
+                  {passwordRules.map(([label, valid]) => (
+                    <li
+                      key={label}
+                      className={valid ? "is-valid" : "is-invalid"}
+                    >
+                      {valid ? (
+                        <CircleCheck size={14} />
+                      ) : (
+                        <CircleX size={14} />
+                      )}
+                      {label}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <small className="field-error">
+                  {errors.password?.message}
+                </small>
+              )}
             </label>
             {signup && (
               <label>
@@ -178,11 +220,31 @@ export default function AuthPage({ mode }) {
                 <input
                   type={visible ? "text" : "password"}
                   autoComplete="new-password"
+                  className={
+                    confirmPasswordValue
+                      ? confirmationMatches
+                        ? "input-valid"
+                        : "input-invalid"
+                      : ""
+                  }
+                  aria-describedby="password-confirmation-status"
                   {...register("confirm_password")}
                 />
-                <small className="field-error">
-                  {errors.confirm_password?.message}
-                </small>
+                {confirmPasswordValue && (
+                  <small
+                    id="password-confirmation-status"
+                    className={`password-match ${confirmationMatches ? "is-valid" : "is-invalid"}`}
+                  >
+                    {confirmationMatches ? (
+                      <CircleCheck size={14} />
+                    ) : (
+                      <CircleX size={14} />
+                    )}
+                    {confirmationMatches
+                      ? "Passwords match"
+                      : "Passwords do not match"}
+                  </small>
+                )}
               </label>
             )}
             {serverError && <p className="form-error">{serverError}</p>}

@@ -102,7 +102,7 @@ async def recommendation_context(state, config):
 
 async def recommendation_criteria(state):
     context = state["context"]
-    query = state.get("query", "").strip() or (context.roles or ["Software Engineer"])[0]
+    query = state.get("query", "").strip() or (context.roles or ["jobs"])[0]
     location = state.get("location")
     if location is None:
         location = context.location

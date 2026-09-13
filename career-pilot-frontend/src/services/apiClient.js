@@ -41,6 +41,16 @@ export const configureAuthClient = ({ getToken, setToken, sessionLost }) => {
   onSessionLost = sessionLost;
 };
 
+export const refreshSession = () => {
+  if (!refreshPromise) {
+    refreshPromise = apiClient.post("/auth/refresh").then((response) => {
+      configureAuthClient.setToken?.(response.data.access_token, response.data.user);
+      return response.data;
+    }).finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+};
+
 apiClient.interceptors.request.use((config) => {
   const protectedAction = /^\/(applications|resumes|ai\/profile)(\/|$)/.test(config.url || "");
   if (protectedAction && ["post", "patch", "delete"].includes(config.method)) {
@@ -66,11 +76,7 @@ apiClient.interceptors.response.use(undefined, async (error) => {
   const originalHeaders = AxiosHeaders.from(original.headers);
   logRegenerateRetry("original", original);
   try {
-    refreshPromise ||= apiClient.post("/auth/refresh").then((response) => {
-      configureAuthClient.setToken?.(response.data.access_token, response.data.user);
-      return response.data.access_token;
-    }).finally(() => { refreshPromise = null; });
-    const token = await refreshPromise;
+    const token = (await refreshSession()).access_token;
     const retry = {
       ...original,
       _retried: true,

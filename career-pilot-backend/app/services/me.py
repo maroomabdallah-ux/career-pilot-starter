@@ -3,7 +3,11 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import CareerProfileNotFoundError, ProfileAccessDeniedError
+from app.core.exceptions import (
+    CareerProfileNotFoundError,
+    IncompleteCareerProfileError,
+    ProfileAccessDeniedError,
+)
 from app.models.user import User
 from app.repositories.career_profile import CareerProfileRepository
 from app.schemas.career_profile import CareerProfileCreate, CareerProfileUpdate
@@ -54,7 +58,10 @@ class MeService:
         await getattr(service, delete_method)(item_id)
 
     async def complete_onboarding(self):
-        await self.profile()
+        profile = await self.profile()
+        has_direction = bool(profile.professional_title and profile.target_roles)
+        if not has_direction or not profile.education or not profile.skills:
+            raise IncompleteCareerProfileError()
         self.user.onboarding_completed = True
         await self.session.commit()
         await self.session.refresh(self.user)

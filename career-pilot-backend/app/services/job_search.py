@@ -64,9 +64,7 @@ class JobSearchService:
             logger.info("Skipping Jooble: JOOBLE_API_KEY not configured")
         return sources
 
-    async def search(
-        self, criteria: JobSearchCriteria, profile_skills: list[str] | None = None
-    ) -> JobSearchResponse:
+    async def search(self, criteria: JobSearchCriteria) -> JobSearchResponse:
         key = criteria.model_dump_json()
         cached = self._cache.get(key)
         if cached and time.monotonic() - cached[0] < self.cache_ttl:
@@ -185,36 +183,6 @@ class JobSearchService:
                 if not buckets[source]:
                     del buckets[source]
         return result
-
-    @staticmethod
-    def _score(job, criteria, profile_skills):
-        text = " ".join([job.title, _plain(job.description), *job.skills]).casefold()
-        title_tokens = set(_tokens(criteria.query))
-        title_overlap = title_tokens.intersection(_tokens(job.title))
-        verified = {skill.casefold(): skill for skill in profile_skills}
-        matched = [name for key, name in verified.items() if key in text]
-        advertised = {skill for skill in job.skills if skill.casefold() not in verified}
-        score = min(100, 30 + 8 * len(title_overlap) + 7 * min(len(matched), 4))
-        reasons = []
-        if title_overlap:
-            reasons.append("Job title aligns with your search")
-        if matched:
-            reasons.append(f"Profile skills matched: {', '.join(matched[:3])}")
-        if criteria.workplace_type and job.workplace_type == criteria.workplace_type:
-            score = min(100, score + 10)
-            reasons.append(f"{job.workplace_type.title()} matches your preference")
-        if criteria.location and criteria.location.casefold() in (job.location or "").casefold():
-            score = min(100, score + 10)
-            reasons.append(f"{criteria.location} matches your location preference")
-        if criteria.experience_level and criteria.experience_level.casefold() in text:
-            score = min(100, score + 8)
-            reasons.append(f"{criteria.experience_level.title()} matches your career level")
-        job.relevance_score = score
-        job.matched_skills = matched
-        job.skill_gaps = sorted(advertised, key=str.casefold)[:5]
-        job.fit_reasons = reasons
-        return job
-
 
 def _plain(value):
     return unescape(HTML.sub(" ", value or ""))

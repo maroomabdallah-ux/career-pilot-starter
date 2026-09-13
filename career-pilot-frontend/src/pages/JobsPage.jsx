@@ -24,7 +24,11 @@ export default function JobsPage() {
   const [query, setQuery] = useState("");
   const [location, setLocation] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [params, setParams] = useState({ page: 1, page_size: 10 });
+  const [params, setParams] = useState({
+    page: 1,
+    page_size: 10,
+    mode: "recommended",
+  });
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -101,13 +105,14 @@ export default function JobsPage() {
   };
   const search = (event) => {
     event.preventDefault();
-    setTab("recommended");
+    setTab("discover");
     setSkipped(new Set());
     setParams({
       q: query.trim(),
       location: location.trim(),
       page: 1,
       page_size: 10,
+      mode: "discover",
       workplace_type: filter === "remote" ? "remote" : undefined,
       employment_type: filter && filter !== "remote" ? filter : undefined,
     });
@@ -131,6 +136,12 @@ export default function JobsPage() {
   const changeTab = (value) => {
     setTab(value);
     setSelected(null);
+    if (value === "recommended") {
+      setParams({ page: 1, page_size: 10, mode: "recommended" });
+    } else if (value === "discover" && params.mode !== "discover") {
+      setFeed(null);
+      setLoading(false);
+    }
   };
 
   return (
@@ -157,14 +168,18 @@ export default function JobsPage() {
         </div>
         <div>
           <strong>
-            {feed?.context_sources?.length
+            {tab === "recommended" && feed?.context_sources?.length
               ? "Your career profile is guiding the search"
-              : "Let’s find your next opportunity"}
+              : tab === "discover"
+                ? "Search across careers and industries"
+                : "Let’s find your next opportunity"}
           </strong>
           <p>
-            {feed?.context_sources?.length
-              ? `Using ${feed.context_sources.join(" + ")} · ${feed.search_query || "Technology roles"}`
-              : "Add skills or a resume to get more personal recommendations."}
+            {tab === "recommended" && feed?.context_sources?.length
+              ? `Using ${feed.context_sources.join(" + ")} · ${feed.search_query || "Your preferred roles"}`
+              : tab === "discover"
+                ? "Search any profession, occupation, company, or keyword without profile filters."
+                : "Add skills or a resume to get more personal recommendations."}
           </p>
         </div>
         <span className="cp-location-pill">
@@ -181,9 +196,10 @@ export default function JobsPage() {
           <span>What</span>
           <input
             aria-label="Job title or keyword"
+            required
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={feed?.search_query || "Role, skill, or company"}
+            placeholder="Nurse, Accountant, Teacher, Designer…"
           />
         </label>
         <label>
@@ -202,6 +218,12 @@ export default function JobsPage() {
       </form>
       <div className="cp-toolbar">
         <div className="cp-tabs">
+          <button
+            className={tab === "discover" ? "active" : ""}
+            onClick={() => changeTab("discover")}
+          >
+            <Search size={15} /> Discover
+          </button>
           <button
             className={tab === "recommended" ? "active" : ""}
             onClick={() => changeTab("recommended")}
@@ -247,7 +269,7 @@ export default function JobsPage() {
               setLocation("");
               setFilter("");
               firstLoad.current = true;
-              setParams({ page: 1, page_size: 10 });
+              setParams({ page: 1, page_size: 10, mode: "recommended" });
             }}
           >
             Use my profile preferences
@@ -259,18 +281,26 @@ export default function JobsPage() {
           {notice}
         </p>
       )}
-      {tab === "recommended" && feed?.message && (
+      {tab !== "saved" && feed?.message && (
         <p className="cp-small-note">{feed.message}</p>
       )}
-      {tab === "recommended" && loading ? (
+      {tab !== "saved" && loading ? (
         <div className="cp-loading" role="status">
           <RefreshCw className="spin" size={22} />
-          <h2>Finding opportunities for you</h2>
-          <p>Checking real listings against your career profile…</p>
+          <h2>
+            {tab === "discover"
+              ? "Searching real job listings"
+              : "Finding opportunities for you"}
+          </h2>
+          <p>
+            {tab === "discover"
+              ? "Checking configured providers for your search…"
+              : "Checking real listings against your career profile…"}
+          </p>
           <div className="cp-skeleton" />
           <div className="cp-skeleton" />
         </div>
-      ) : tab === "recommended" && error ? (
+      ) : tab !== "saved" && error ? (
         <div className="cp-empty">
           <h2>We couldn’t load your opportunities</h2>
           <p>{apiErrorMessage(error)}</p>
@@ -288,12 +318,18 @@ export default function JobsPage() {
               <h2>
                 {tab === "saved"
                   ? "Your saved opportunities"
-                  : "Recommended for you"}
+                  : tab === "discover"
+                    ? feed
+                      ? `Results for “${feed.search_query}”`
+                      : "Discover any career"
+                    : "Recommended for you"}
               </h2>
               <p>
                 {tab === "saved"
                   ? "Your shortlist, ready whenever you are."
-                  : "Best available matches first. Explore every role at your own pace."}
+                  : tab === "discover"
+                    ? "Broad search without Career Profile filters."
+                    : "Best available matches first. Explore every role at your own pace."}
               </p>
             </div>
             <span>
@@ -313,7 +349,7 @@ export default function JobsPage() {
                   onSave={() => act(job, "save")}
                   onApply={() => act(job, "apply")}
                   onSkip={
-                    tab === "recommended"
+                    tab !== "saved"
                       ? () => {
                           setSkipped((old) => new Set([...old, jobKey(job)]));
                           if (selected && jobKey(selected) === jobKey(job))
@@ -329,12 +365,16 @@ export default function JobsPage() {
                   <h2>
                     {tab === "saved"
                       ? "Build your shortlist"
-                      : "No opportunities in this view"}
+                      : tab === "discover" && !feed
+                        ? "Search any occupation or industry"
+                        : "No opportunities in this view"}
                   </h2>
                   <p>
                     {tab === "saved"
                       ? "Save a role from your recommendations to find it here later."
-                      : "Try another role or location, or restore jobs skipped during this visit."}
+                      : tab === "discover" && !feed
+                        ? "Try Nurse, Accountant, Teacher, Marketing Manager, or any role you choose."
+                        : "Try another role or location, or restore jobs skipped during this visit."}
                   </p>
                   {skipped.size > 0 && (
                     <button

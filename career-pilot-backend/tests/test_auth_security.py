@@ -26,6 +26,10 @@ def test_password_policy_and_protected_route_contract():
         SignupRequest(
             email="user@example.com", password="onlyletters", first_name="A", last_name="B"
         )
+    with pytest.raises(ValueError):
+        SignupRequest(
+            email="user@example.com", password="Password1", first_name="A", last_name="B"
+        )
     client = TestClient(app)
     assert client.get("/api/v1/auth/me").status_code == 401
     assert client.get("/api/v1/me/profile").status_code == 401

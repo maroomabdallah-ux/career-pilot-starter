@@ -13,8 +13,14 @@ class SignupRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_password(self):
-        if not re.search(r"[A-Za-z]", self.password) or not re.search(r"\d", self.password):
-            raise ValueError("Password must contain at least one letter and one number")
+        if (
+            not re.search(r"[A-Za-z]", self.password)
+            or not re.search(r"\d", self.password)
+            or not re.search(r"[^A-Za-z0-9]", self.password)
+        ):
+            raise ValueError(
+                "Password must contain at least one letter, one number, and one symbol"
+            )
         return self
 
 
