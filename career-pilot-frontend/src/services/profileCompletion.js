@@ -7,9 +7,10 @@ export const profileCompletionConfig = {
   skills: 20,
 };
 
-const completeEducation = (x) =>
-  x?.institution && x?.degree && x?.field_of_study && x?.start_date;
-const completeExperience = (x) => x?.company && x?.job_title && x?.start_date;
+// CV imports often provide a verified institution/degree and employer/role,
+// but not dates. Those records are still meaningful profile evidence.
+const completeEducation = (x) => x?.institution && (x?.degree || x?.field_of_study);
+const completeExperience = (x) => x?.company && x?.job_title;
 const completeProject = (x) => x?.name && x?.description;
 
 export function calculateProfileCompletion(profile) {

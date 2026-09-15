@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, Response, status
+from fastapi.responses import JSONResponse
 
 from app.api.dependencies import CurrentUser, SessionDep
 from app.core.config import settings
@@ -19,6 +20,25 @@ def set_refresh_cookie(response: Response, token: str) -> None:
         samesite="lax",
         path=f"{settings.API_V1_PREFIX}/auth",
     )
+
+
+def clear_refresh_cookie(response: Response) -> None:
+    response.delete_cookie(
+        settings.REFRESH_COOKIE_NAME,
+        path=f"{settings.API_V1_PREFIX}/auth",
+    )
+
+
+def invalid_refresh_response() -> JSONResponse:
+    # Raising an API exception loses mutations made to FastAPI's injected
+    # response. Return this response directly so a rotated/revoked cookie is
+    # actually removed from the browser and cannot trigger 401s forever.
+    response = JSONResponse(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        content={"detail": "Authentication required"},
+    )
+    clear_refresh_cookie(response)
+    return response
 
 
 def token_response(response: Response, result) -> AccessTokenResponse:
@@ -48,18 +68,22 @@ async def login(data: LoginRequest, request: Request, response: Response, sessio
 async def refresh(request: Request, response: Response, session: SessionDep):
     token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
     if not token:
+        return invalid_refresh_response()
+    try:
+        result = await AuthService(session).refresh(token, request.headers.get("user-agent"))
+    except Exception as exc:
         from app.core.exceptions import AuthenticationError
 
-        raise AuthenticationError()
-    return token_response(
-        response, await AuthService(session).refresh(token, request.headers.get("user-agent"))
-    )
+        if isinstance(exc, AuthenticationError):
+            return invalid_refresh_response()
+        raise
+    return token_response(response, result)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(request: Request, response: Response, session: SessionDep):
     await AuthService(session).logout(request.cookies.get(settings.REFRESH_COOKIE_NAME))
-    response.delete_cookie(settings.REFRESH_COOKIE_NAME, path=f"{settings.API_V1_PREFIX}/auth")
+    clear_refresh_cookie(response)
 
 
 @router.get("/me", response_model=UserResponse)

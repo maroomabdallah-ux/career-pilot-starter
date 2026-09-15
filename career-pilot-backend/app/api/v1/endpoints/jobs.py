@@ -8,6 +8,7 @@ from app.graphs.job_search_graph import job_search_graph, recommendation_graph
 from app.mcp.clients.core_client import CareerPilotMCPClient
 from app.schemas.job import (
     JobResult,
+    JobSearchCriteria,
     JobSearchRequest,
     JobSearchResponse,
     PaginatedJobSearchResponse,
@@ -15,11 +16,22 @@ from app.schemas.job import (
     SavedJobResponse,
     SearchHistoryResponse,
 )
+from app.services.job_links import validate_job_link
 from app.services.job_search import JobSearchService
 from app.services.jobs import SavedJobService
 
 router = APIRouter()
 direct_job_search = JobSearchService()
+TECHNICAL_SKILL_QUERIES = {
+    "python", "java", "javascript", "typescript", "react", "angular", "vue",
+    "node.js", "fastapi", "django", "flask", "sql", "docker", "kubernetes",
+}
+
+
+@router.post("/validate-link", response_model=JobResult)
+async def validate_link(job: JobResult, user: CurrentUser):
+    del user
+    return await validate_job_link(job)
 
 
 @router.get("/search", response_model=PaginatedJobSearchResponse)
@@ -38,16 +50,34 @@ async def paginated_search_jobs(
         raise HTTPException(422, "page must be at least 1 and page_size must be 10")
     try:
         if mode == "discover":
-            if not q.strip():
-                raise HTTPException(422, "Enter any occupation, industry, or keyword to search")
             criteria = JobSearchCriteria(
-                query=q,
+                query=q.strip(),
                 location=location or None,
                 workplace_type=workplace_type,
                 employment_type=employment_type,
                 limit=50,
             )
             result = await direct_job_search.search(criteria)
+            # Skills such as "Python" are often absent from a provider's title
+            # index even though the role requires them. Retry locally with a
+            # role-shaped query before concluding that no local roles exist.
+            if (
+                not result.jobs
+                and q.strip().casefold() in TECHNICAL_SKILL_QUERIES
+                and location
+            ):
+                criteria = criteria.model_copy(update={"query": f"{q.strip()} Developer"})
+                result = await direct_job_search.search(criteria)
+            # If local sources return no listing at all, keep the useful
+            # worldwide result set but label it honestly rather than silently
+            # treating it as a match for the requested city/country.
+            if not result.jobs and location:
+                criteria = criteria.model_copy(update={"location": None})
+                result = await direct_job_search.search(criteria)
+                if result.jobs:
+                    result.message = (
+                        f"No current listings were returned for {location}; showing broader results."
+                    )
             context_sources = []
         else:
             state = await recommendation_graph.ainvoke(

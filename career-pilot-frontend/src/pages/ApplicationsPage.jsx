@@ -18,7 +18,7 @@ const labels = {
   draft: "Draft",
   ready_for_review: "Ready for review",
   external_application: "Continue externally",
-  submitted_externally: "Submitted · self-reported",
+  applied: "Applied",
   interview: "Interview",
   offer: "Offer",
   rejected: "Rejected",
@@ -27,8 +27,8 @@ const labels = {
 const transitions = {
   draft: ["withdrawn"],
   ready_for_review: ["withdrawn"],
-  external_application: ["submitted_externally", "withdrawn"],
-  submitted_externally: ["interview", "offer", "rejected", "withdrawn"],
+  external_application: ["applied", "withdrawn"],
+  applied: ["interview", "offer", "rejected", "withdrawn"],
   interview: ["offer", "rejected", "withdrawn"],
   offer: ["withdrawn"],
 };
@@ -598,6 +598,29 @@ export default function ApplicationsPage() {
                         >
                           Open application website <ArrowUpRight size={16} />
                         </a>
+                        {item.status === "external_application" && (
+                          <div className="cp-detail-cta">
+                            <button
+                              className="button secondary"
+                              disabled={busy}
+                              onClick={() =>
+                                act(() =>
+                                  careerApi.trackApplication(item.id, {
+                                    version: item.version,
+                                    status: "applied",
+                                    notes: "",
+                                    confirmed: true,
+                                  }),
+                                )
+                              }
+                            >
+                              Yes, submitted
+                            </button>
+                            <button className="cp-text-button" type="button">
+                              Not yet
+                            </button>
+                          </div>
+                        )}
                       </section>
                     )}
                   </>
@@ -642,8 +665,8 @@ export default function ApplicationsPage() {
                             checked={confirmed}
                             onChange={(e) => setConfirmed(e.target.checked)}
                           />{" "}
-                          {nextStatus === "submitted_externally"
-                            ? "I confirm I submitted this application on the external website."
+                          {nextStatus === "applied"
+                            ? "Yes, I submitted this application on the external website."
                             : "I confirm this update reflects what actually happened."}
                         </label>
                         <button

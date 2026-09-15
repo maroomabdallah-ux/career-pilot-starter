@@ -10,7 +10,7 @@ from app.models.resume import Resume
 from app.repositories.career_profile import CareerProfileRepository
 from app.repositories.resume import ResumeRepository
 from app.schemas.application import ApplicationResponse
-from app.services.jobs import SavedJobService
+from app.services.job_links import validate_job_link
 
 
 class ApplicationService:
@@ -50,12 +50,17 @@ class ApplicationService:
         self.session.add(ApplicationEvent(application_id=item.id, kind=kind, message=message))
 
     async def create(self, job):
-        saved = await SavedJobService(self.session, self.user.id).save(job)
+        job = await validate_job_link(job)
+        if job.link_status in {"invalid", "expired"} or job.normalized_status in {
+            "closed",
+            "expired",
+        }:
+            raise ConflictError("This application is no longer available.")
         inserted = await self.session.scalar(
             insert(JobApplication)
             .values(
                 user_id=self.user.id,
-                saved_job_id=saved.id,
+                saved_job_id=None,
                 source=job.source,
                 external_job_id=job.external_id,
                 job_snapshot=job.model_dump(mode="json"),
@@ -250,14 +255,14 @@ class ApplicationService:
         allowed = {
             "draft": {"withdrawn"},
             "ready_for_review": {"withdrawn"},
-            "external_application": {"submitted_externally", "withdrawn"},
-            "submitted_externally": {"interview", "offer", "rejected", "withdrawn"},
+            "external_application": {"applied", "withdrawn"},
+            "applied": {"interview", "offer", "rejected", "withdrawn"},
             "interview": {"offer", "rejected", "withdrawn"},
             "offer": {"withdrawn"},
         }
         if data.status not in allowed.get(item.status, set()):
             raise ConflictError("That status transition is not available.")
-        if data.status == "submitted_externally":
+        if data.status == "applied":
             item.applied_at = datetime.now(UTC)
             item.submission_evidence = "user_reported"
         item.status, item.notes = data.status, data.notes

@@ -1,14 +1,17 @@
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, File, UploadFile, status
 
 from app.api.dependencies import CurrentUser, SessionDep
 from app.schemas.career_profile import CareerProfileResponse, CareerProfileUpdate
 from app.schemas.education import EducationCreate, EducationResponse, EducationUpdate
 from app.schemas.experience import ExperienceCreate, ExperienceResponse, ExperienceUpdate
+from app.schemas.onboarding import CVConfirm, CVReview
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
 from app.schemas.skill import SkillCreate, SkillResponse, SkillUpdate
 from app.schemas.user import UserResponse
+from app.services.cv_onboarding import confirm_cv_review, extract_text, parse_cv_text
 from app.services.education import EducationService
 from app.services.experience import ExperienceService
 from app.services.me import MeService
@@ -16,6 +19,17 @@ from app.services.project import ProjectService
 from app.services.skill import SkillService
 
 router = APIRouter()
+
+
+@router.post("/onboarding/cv/review", response_model=CVReview)
+async def review_cv(user: CurrentUser, file: Annotated[UploadFile, File()]):
+    del user
+    return parse_cv_text(await extract_text(file))
+
+
+@router.post("/onboarding/cv/confirm", response_model=CareerProfileResponse)
+async def confirm_cv(data: CVConfirm, session: SessionDep, user: CurrentUser):
+    return await confirm_cv_review(session, user, data.review)
 
 
 @router.get("/profile", response_model=CareerProfileResponse)

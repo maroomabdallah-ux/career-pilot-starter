@@ -51,8 +51,13 @@ async def load_career_context(session, user_id):
         context.sources.append("Resume")
     if profile:
         context.sources.append("Career profile")
-        context.roles = profile.target_roles or (
-            [profile.professional_title] if profile.professional_title else []
+        # The professional title is the concise, verified search anchor. CV
+        # imports may contain a long generated target_roles string that is not
+        # usable as a provider query.
+        context.roles = (
+            [profile.professional_title]
+            if profile.professional_title
+            else (profile.target_roles or [])
         )
         context.location = (profile.preferred_locations or [""])[0] or ", ".join(
             x for x in (profile.city, profile.country) if x
@@ -69,7 +74,9 @@ async def load_career_context(session, user_id):
         education = " ".join(
             f"{x.degree or ''} {x.field_of_study or ''}" for x in profile.education
         )
-        context.text = f"{profile.professional_summary or ''} {experience} {projects} {education} {resume_text}"
+        context.text = " ".join(
+            [profile.professional_summary or "", experience, projects, education, resume_text]
+        )
         context.skills = [x.name for x in profile.skills]
         context.level = infer_experience_level(" ".join(context.roles))
         if not context.level and profile.years_of_experience:
@@ -147,3 +154,22 @@ def rank_jobs(jobs, context):
         else:
             job.skill_gaps = []
     return sorted(jobs, key=lambda job: job.match_score or 0, reverse=True)
+
+
+def expand_search_roles(context: CareerContext, limit: int = 6) -> list[str]:
+    """Build domain-neutral searches from verified titles and skills."""
+    candidates = [*context.roles]
+    role = context.roles[0] if context.roles else ""
+    role_words = words(role)
+    for skill in context.skills:
+        skill_words = words(skill)
+        if skill_words and not skill_words <= role_words:
+            candidates.append(f"{skill} {role}".strip())
+    if context.level and role:
+        candidates.append(f"{context.level.title()} {role}")
+    result = []
+    for value in candidates:
+        cleaned = " ".join(value.split())
+        if cleaned and cleaned.casefold() not in {x.casefold() for x in result}:
+            result.append(cleaned)
+    return result[:limit]

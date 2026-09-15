@@ -25,7 +25,9 @@ async def understand(state):
 
 async def load_profile(state, config):
     extracted = state["extracted"]
-    if extracted.get("query") and (extracted.get("location") or extracted.get("workplace_type")):
+    # An explicit occupation is a Discover search.  It must remain independent
+    # of the member's profile, skills, location, and previous career field.
+    if extracted.get("query"):
         return {}
     client = config["configurable"]["mcp_client"]
     async with client.read_session() as mcp:
@@ -38,18 +40,20 @@ async def resolve(state):
     values = dict(state["extracted"])
     profile = state.get("profile", {})
     skills = state.get("skills", [])
-    values["query"] = (
-        values.get("query")
-        or (profile.get("target_roles") or [None])[0]
-        or profile.get("professional_title")
-    )
-    modes = [str(x).casefold() for x in profile.get("preferred_work_modes", [])]
-    if not values.get("workplace_type"):
-        values["workplace_type"] = next(
-            (x for x in ("remote", "hybrid", "on-site") if x in modes), None
+    if not values.get("query"):
+        values["query"] = (
+            (profile.get("target_roles") or [None])[0]
+            or profile.get("professional_title")
         )
-    values["location"] = values.get("location") or (profile.get("preferred_locations") or [None])[0]
-    values["skills"] = [item["name"] for item in skills[:10]]
+        modes = [str(x).casefold() for x in profile.get("preferred_work_modes", [])]
+        if not values.get("workplace_type"):
+            values["workplace_type"] = next(
+                (x for x in ("remote", "hybrid", "on-site") if x in modes), None
+            )
+        values["location"] = values.get("location") or (
+            profile.get("preferred_locations") or [None]
+        )[0]
+        values["skills"] = [item["name"] for item in skills[:10]]
     if not values.get("query"):
         return {"clarification": "What job title or career field would you like me to search for?"}
     return {"criteria": JobSearchCriteria(**values).model_dump(mode="json")}
@@ -102,12 +106,25 @@ async def recommendation_context(state, config):
 
 async def recommendation_criteria(state):
     context = state["context"]
-    query = state.get("query", "").strip() or (context.roles or ["jobs"])[0]
+    from app.services.job_recommendations import expand_search_roles
+
+    expansions = expand_search_roles(context)
+    # Providers receive one focused occupation, not a concatenation of every
+    # role and skill in the profile (which is too restrictive to match).
+    query = state.get("query", "").strip() or (context.roles or expansions or [""])[0]
+    if not query:
+        query = "career opportunities"
     location = state.get("location")
-    if location is None:
+    modes = [str(mode).casefold() for mode in context.modes]
+    mode = state.get("workplace_type") or (
+        "remote" if "remote" in modes else None
+    )
+    # A remote preference is worldwide unless the member explicitly enters a
+    # location in this request. Do not silently constrain it to their home city.
+    if location is None and mode != "remote":
         location = context.location
     remote_location = (location or "").strip().casefold() == "remote"
-    mode = state.get("workplace_type") or ("remote" if remote_location else None)
+    mode = mode or ("remote" if remote_location else None)
     # Remote is a work mode, not a geographic location supported by SerpApi.
     return {
         "criteria": JobSearchCriteria(
@@ -122,7 +139,16 @@ async def recommendation_criteria(state):
 
 async def recommendation_fetch(state, config):
     service = config["configurable"]["job_service"]
-    return {"result": await service.search(state["criteria"])}
+    result = await service.search(state["criteria"])
+    # Some providers do not consistently classify remote listings. Keep the
+    # member's remote preference for the first pass, then broaden only when it
+    # would otherwise leave the recommendations empty.
+    if not result.jobs and state["criteria"].workplace_type:
+        broadened = state["criteria"].model_copy(update={"workplace_type": None})
+        result = await service.search(broadened)
+        if result.jobs:
+            result.message = "No exact work-arrangement matches were found; showing relevant open roles."
+    return {"result": result}
 
 
 async def recommendation_rank(state):
@@ -130,6 +156,7 @@ async def recommendation_rank(state):
 
     result = state["result"].model_copy(deep=True)
     result.jobs = rank_jobs(result.jobs, state["context"])
+    result.result_count = len(result.jobs)
     return {"result": result}
 
 

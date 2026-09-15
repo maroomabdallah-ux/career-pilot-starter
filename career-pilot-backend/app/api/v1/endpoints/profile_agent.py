@@ -24,11 +24,13 @@ from app.agents.profile.service import (
     ProfileUnderstandingService,
     language_message,
 )
+from app.agents.jobs.service import is_job_search_request
 from app.ai.context import ai_conversation
 from app.api.dependencies import AccessTokenDep, AIUser, CurrentUser
 from app.api.idempotency import IdempotentRoute
 from app.core.config import settings
 from app.graphs.profile_graph import profile_graph
+from app.graphs.job_search_graph import job_search_graph
 from app.mcp.clients.core_client import CareerPilotMCPClient
 from app.schemas.career_profile import CareerProfileUpdate
 from app.schemas.education import EducationCreate, EducationUpdate
@@ -206,6 +208,48 @@ async def revise_proposal(proposal, edited_fields, mcp):
 @router.post("/chat", response_model=AgentResponse)
 async def chat(data: ChatRequest, user: AIUser, access_token: AccessTokenDep):
     thread_id = data.thread_id or str(uuid4())
+    if is_job_search_request(data.message):
+        try:
+            state = await job_search_graph.ainvoke(
+                {"prompt": data.message, "supplied_criteria": {}},
+                config={
+                    "configurable": {
+                        "mcp_client": CareerPilotMCPClient(access_token),
+                    }
+                },
+            )
+            if state.get("clarification"):
+                return AgentResponse(
+                    type="message",
+                    thread_id=thread_id,
+                    message=state["clarification"],
+                )
+            result = state["result"]
+            jobs = result.get("jobs", [])
+            criteria = result.get("criteria")
+            if not jobs:
+                query = (criteria or {}).get("query") or "matching"
+                location = (criteria or {}).get("location")
+                suffix = f" in {location}" if location else ""
+                return AgentResponse(
+                    type="job_search",
+                    thread_id=thread_id,
+                    message=(
+                        f"I couldn't find active {query} jobs{suffix} from the available sources right now."
+                    ),
+                    search_criteria=criteria,
+                )
+            return AgentResponse(
+                type="job_search",
+                thread_id=thread_id,
+                message=f"I found {len(jobs)} active opportunities from the available sources.",
+                jobs=jobs[:5],
+                search_criteria=criteria,
+                has_more_jobs=len(jobs) > 5,
+            )
+        except Exception:
+            logger.exception("job-search agent failed thread=%s", thread_id)
+            raise HTTPException(503, "Job search is temporarily unavailable.") from None
     try:
         with ai_conversation(thread_id):
             intent = await ProfileUnderstandingService().understand(data.message)

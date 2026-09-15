@@ -78,6 +78,9 @@ export function JobCard({
   onApply,
   onSkip,
 }) {
+  const unavailable =
+    ["invalid", "expired"].includes(job.link_status) ||
+    ["closed", "expired"].includes(job.normalized_status);
   return (
     <article
       className={`cp-job-card ${selected ? "is-selected" : ""}`}
@@ -91,11 +94,6 @@ export function JobCard({
             {job.title}
           </button>
         </div>
-        {job.match_score != null && (
-          <span className="cp-match">
-            {job.match_score}% <small>match</small>
-          </span>
-        )}
       </div>
       <JobMeta job={job} />
       {job.salary && <p className="cp-salary">{job.salary}</p>}
@@ -140,13 +138,13 @@ export function JobCard({
           </button>
           <button
             className="cp-apply-small"
-            disabled={busy}
+            disabled={busy || unavailable}
             onClick={(event) => {
               event.stopPropagation();
               onApply();
             }}
           >
-            Apply
+            {unavailable ? "Unavailable" : "Apply"}
           </button>
         </div>
       </div>
@@ -174,6 +172,9 @@ export function JobDetails({ job, saved, busy, onSave, onApply, onClose }) {
         </div>
       </aside>
     );
+  const unavailable =
+    ["invalid", "expired"].includes(job.link_status) ||
+    ["closed", "expired"].includes(job.normalized_status);
   return (
     <aside className="cp-job-details">
       <div className="cp-detail-top">
@@ -188,8 +189,15 @@ export function JobDetails({ job, saved, busy, onSave, onApply, onClose }) {
       <JobMeta job={job} />
       {job.salary && <p className="cp-salary">{job.salary}</p>}
       <div className="cp-detail-cta">
-        <button className="button primary" disabled={busy} onClick={onApply}>
-          Prepare application <ArrowUpRight size={16} />
+        <button
+          className="button primary"
+          disabled={busy || unavailable}
+          onClick={onApply}
+        >
+          {unavailable
+            ? "This application is no longer available"
+            : "Apply with CareerPilot"}{" "}
+          <ArrowUpRight size={16} />
         </button>
         <button className="button secondary" disabled={busy} onClick={onSave}>
           {saved ? <BookmarkCheck size={17} /> : <Bookmark size={17} />}{" "}
@@ -200,27 +208,6 @@ export function JobDetails({ job, saved, busy, onSave, onApply, onClose }) {
         Review your materials before approving. Nothing is submitted
         automatically.
       </p>
-      {job.match_score != null && (
-        <section className="cp-match-panel">
-          <div>
-            <strong>CareerPilot Match</strong>
-            <span className="cp-match">{job.match_score}%</span>
-          </div>
-          <p>Evidence from your saved career data, not a hiring probability.</p>
-          <ul>
-            {job.fit_reasons?.map((reason) => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
-          {!!job.skill_gaps?.length && (
-            <p>
-              <strong>Not found in your profile:</strong>{" "}
-              {job.skill_gaps.join(", ")}. These skills appear in the job
-              description.
-            </p>
-          )}
-        </section>
-      )}
       <section className="cp-description">
         <h3>About the opportunity</h3>
         <p>

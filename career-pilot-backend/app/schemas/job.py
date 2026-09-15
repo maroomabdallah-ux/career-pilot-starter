@@ -8,7 +8,8 @@ WorkplaceType = Literal["remote", "hybrid", "on-site", "unknown"]
 
 
 class JobSearchCriteria(BaseModel):
-    query: str = Field(min_length=2, max_length=200)
+    # Discover supports an intentionally blank query for browsing current jobs.
+    query: str = Field(default="", max_length=200)
     location: str | None = Field(default=None, max_length=160)
     country: str | None = Field(default=None, max_length=100)
     workplace_type: WorkplaceType | None = None
@@ -55,6 +56,9 @@ class JobResult(BaseModel):
     skill_gaps: list[str] = Field(default_factory=list)
     fit_reasons: list[str] = Field(default_factory=list)
     expired: bool = False
+    normalized_status: Literal["active", "closed", "expired", "unverified"] = "unverified"
+    link_status: Literal["valid", "invalid", "expired", "restricted", "unverified"] = "unverified"
+    link_checked_at: datetime | None = None
 
     @computed_field
     @property

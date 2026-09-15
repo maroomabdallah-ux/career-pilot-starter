@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   Bookmark,
@@ -17,18 +17,24 @@ import "../features/jobs/workspace.css";
 
 export default function JobsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState("recommended");
+  const routeLocation = useLocation();
+  const agentSearch = routeLocation.state?.jobSearch;
+  const [tab, setTab] = useState(agentSearch ? "discover" : "recommended");
   const [feed, setFeed] = useState(null);
   const [saved, setSaved] = useState([]);
-  const [selected, setSelected] = useState(null);
-  const [query, setQuery] = useState("");
-  const [location, setLocation] = useState("");
+  const [profile, setProfile] = useState(null);
+  const [selected, setSelected] = useState(routeLocation.state?.selectedJob || null);
+  const [pendingJobKey, setPendingJobKey] = useState(routeLocation.state?.selectedJobKey || null);
+  const [query, setQuery] = useState(agentSearch?.query || "");
+  const [location, setLocation] = useState(agentSearch?.location || "");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [params, setParams] = useState({
+  const [params, setParams] = useState(() => agentSearch ? ({
+    q: agentSearch.query,
+    location: agentSearch.location,
     page: 1,
     page_size: 10,
-    mode: "recommended",
-  });
+    mode: "discover",
+  }) : ({ page: 1, page_size: 10, mode: "recommended" }));
   const [filter, setFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -48,6 +54,28 @@ export default function JobsPage() {
       );
   }, []);
   useEffect(() => {
+    careerApi.getProfile().then(setProfile).catch(() => setProfile(null));
+  }, []);
+  useEffect(() => {
+    if (!routeLocation.state?.jobSearch) return;
+    const requested = routeLocation.state.jobSearch;
+    setTab("discover");
+    setQuery(requested.query || "");
+    setLocation(requested.location || "");
+    setSelected(routeLocation.state.selectedJob || null);
+    setPendingJobKey(routeLocation.state.selectedJobKey || null);
+    setParams({
+      q: requested.query || "",
+      location: requested.location || "",
+      workplace_type: requested.workplace_type,
+      employment_type: requested.employment_type,
+      page: 1,
+      page_size: 10,
+      mode: "discover",
+    });
+    navigate(routeLocation.pathname, { replace: true, state: null });
+  }, [navigate, routeLocation.pathname, routeLocation.state]);
+  useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
     setError(null);
@@ -56,6 +84,11 @@ export default function JobsPage() {
       .searchJobsPage(params, controller.signal)
       .then((result) => {
         setFeed(result);
+        if (pendingJobKey) {
+          const requestedJob = result.jobs.find((job) => jobKey(job) === pendingJobKey);
+          if (requestedJob) setSelected(requestedJob);
+          setPendingJobKey(null);
+        }
         if (firstLoad.current) {
           setLocation(result.search_location || "");
           firstLoad.current = false;
@@ -117,6 +150,26 @@ export default function JobsPage() {
       employment_type: filter && filter !== "remote" ? filter : undefined,
     });
   };
+  const applyRecommendedFilters = (event) => {
+    event.preventDefault();
+    setTab("recommended");
+    setSkipped(new Set());
+    setParams({
+      q: query.trim(),
+      location: location.trim(),
+      page: 1,
+      page_size: 10,
+      mode: "recommended",
+    });
+  };
+  const suggestedRoles = [
+    profile?.professional_title,
+    ...(profile?.target_roles || []),
+  ].filter((role, index, items) => role && items.indexOf(role) === index);
+  const suggestedLocations = [
+    ...(profile?.preferred_locations || []),
+    [profile?.city, profile?.country].filter(Boolean).join(", "),
+  ].filter((place, index, items) => place && items.indexOf(place) === index);
   const allSaved = saved.map((item) => item.snapshot);
   const savedPages = Math.max(1, Math.ceil(allSaved.length / 10));
   const page =
@@ -139,8 +192,13 @@ export default function JobsPage() {
     if (value === "recommended") {
       setParams({ page: 1, page_size: 10, mode: "recommended" });
     } else if (value === "discover" && params.mode !== "discover") {
-      setFeed(null);
-      setLoading(false);
+      // Discover is an immediate, unpersonalized job feed. Never carry the
+      // location, role, or work-mode values from the personalized tab.
+      setQuery("");
+      setLocation("");
+      setFilter("");
+      firstLoad.current = false;
+      setParams({ page: 1, page_size: 10, mode: "discover", q: "" });
     }
   };
 
@@ -190,13 +248,15 @@ export default function JobsPage() {
           Update profile <ArrowRight size={14} />
         </Link>
       </section>
-      <form className="cp-quick-search" onSubmit={search}>
+      <form
+        className="cp-quick-search"
+        onSubmit={tab === "recommended" ? applyRecommendedFilters : search}
+      >
         <label>
           <Search size={18} />
           <span>What</span>
           <input
             aria-label="Job title or keyword"
-            required
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Nurse, Accountant, Teacher, Designer…"
@@ -246,18 +306,47 @@ export default function JobsPage() {
         </button>
       </div>
       {filtersOpen && (
-        <form className="cp-search-form" onSubmit={search}>
-          <select
-            aria-label="Job type"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          >
-            <option value="">All work types</option>
-            <option value="remote">Remote</option>
-            <option value="full-time">Full-time</option>
-            <option value="part-time">Part-time</option>
-            <option value="internship">Internship</option>
-          </select>
+        <form
+          className="cp-search-form"
+          onSubmit={tab === "recommended" ? applyRecommendedFilters : search}
+        >
+          {tab === "recommended" && (
+            <>
+              <select
+                aria-label="Suggested profession"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              >
+                <option value="">All suggested professions</option>
+                {suggestedRoles.map((role) => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+              <select
+                aria-label="Preferred country or location"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+              >
+                <option value="">All countries and locations</option>
+                {suggestedLocations.map((place) => (
+                  <option key={place} value={place}>{place}</option>
+                ))}
+              </select>
+            </>
+          )}
+          {tab !== "recommended" && (
+            <select
+              aria-label="Job type"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
+              <option value="">All work types</option>
+              <option value="remote">Remote</option>
+              <option value="full-time">Full-time</option>
+              <option value="part-time">Part-time</option>
+              <option value="internship">Internship</option>
+            </select>
+          )}
           <button className="button primary" disabled={loading}>
             Apply filter
           </button>
@@ -269,10 +358,11 @@ export default function JobsPage() {
               setLocation("");
               setFilter("");
               firstLoad.current = true;
+              setTab("recommended");
               setParams({ page: 1, page_size: 10, mode: "recommended" });
             }}
           >
-            Use my profile preferences
+            Show personalized recommendations
           </button>
         </form>
       )}
@@ -320,7 +410,11 @@ export default function JobsPage() {
                   ? "Your saved opportunities"
                   : tab === "discover"
                     ? feed
-                      ? `Results for “${feed.search_query}”`
+                      ? feed.search_query
+                        ? `Results for “${feed.search_query}”`
+                        : feed.search_location
+                          ? `Jobs in ${feed.search_location}`
+                          : "Latest opportunities"
                       : "Discover any career"
                     : "Recommended for you"}
               </h2>
@@ -329,7 +423,7 @@ export default function JobsPage() {
                   ? "Your shortlist, ready whenever you are."
                   : tab === "discover"
                     ? "Broad search without Career Profile filters."
-                    : "Best available matches first. Explore every role at your own pace."}
+                    : "Recommendations are ordered using your saved career profile."}
               </p>
             </div>
             <span>
@@ -367,14 +461,14 @@ export default function JobsPage() {
                       ? "Build your shortlist"
                       : tab === "discover" && !feed
                         ? "Search any occupation or industry"
-                        : "No opportunities in this view"}
+                        : "No opportunities yet"}
                   </h2>
                   <p>
                     {tab === "saved"
                       ? "Save a role from your recommendations to find it here later."
                       : tab === "discover" && !feed
                         ? "Try Nurse, Accountant, Teacher, Marketing Manager, or any role you choose."
-                        : "Try another role or location, or restore jobs skipped during this visit."}
+                        : "Try another role or location, or update your career profile and check again."}
                   </p>
                   {skipped.size > 0 && (
                     <button

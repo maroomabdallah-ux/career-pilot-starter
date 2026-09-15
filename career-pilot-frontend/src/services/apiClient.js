@@ -52,9 +52,14 @@ export const refreshSession = () => {
 };
 
 apiClient.interceptors.request.use((config) => {
+  config.headers = AxiosHeaders.from(config.headers);
+  // Let the browser add the multipart boundary. The client-wide JSON default
+  // otherwise makes FastAPI see an empty form and report `file` as missing.
+  if (config.data instanceof FormData) {
+    config.headers.delete("Content-Type");
+  }
   const protectedAction = /^\/(applications|resumes|ai\/profile)(\/|$)/.test(config.url || "");
   if (protectedAction && ["post", "patch", "delete"].includes(config.method)) {
-    config.headers = AxiosHeaders.from(config.headers);
     if (!config.headers.has("Idempotency-Key")) config.headers.set("Idempotency-Key", crypto.randomUUID());
   }
   const token = typeof accessToken === "function" ? accessToken() : null;

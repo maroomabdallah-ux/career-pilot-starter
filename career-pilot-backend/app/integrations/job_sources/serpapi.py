@@ -27,7 +27,14 @@ class SerpApiJobProvider(JobProvider):
         self.api_key, self.client = api_key, client
 
     async def search(self, criteria: JobSearchCriteria) -> JobProviderResult:
-        params = {"engine": "google_jobs", "q": criteria.query, "api_key": self.api_key}
+        # Google Jobs requires a non-empty query.  Discover's blank search is
+        # a browse request, so use its broad jobs query without adding a UI or
+        # profile-derived occupation filter.
+        params = {
+            "engine": "google_jobs",
+            "q": criteria.query or "jobs",
+            "api_key": self.api_key,
+        }
         if criteria.location:
             params["location"] = criteria.location
         if criteria.page_token:

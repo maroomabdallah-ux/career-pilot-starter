@@ -1,7 +1,11 @@
 from datetime import UTC, datetime
 
 from app.schemas.job import JobResult
-from app.services.job_recommendations import CareerContext, rank_jobs
+from app.services.job_recommendations import (
+    CareerContext,
+    expand_search_roles,
+    rank_jobs,
+)
 
 
 def listing(title, description):
@@ -44,3 +48,16 @@ def test_other_user_scores_do_not_mutate_shared_candidates():
     rank_jobs([private], CareerContext(skills=["Python"]))
     assert shared.match_score is None
     assert shared.matched_skills == []
+
+
+def test_role_expansion_is_profile_driven_and_domain_neutral():
+    nurse = expand_search_roles(CareerContext(roles=["Registered Nurse"], skills=["Triage"]))
+    accountant = expand_search_roles(
+        CareerContext(roles=["Accountant"], skills=["Accounts Payable"])
+    )
+    marketing = expand_search_roles(CareerContext(roles=["Marketing Specialist"], skills=["SEO"]))
+
+    assert nurse == ["Registered Nurse", "Triage Registered Nurse"]
+    assert accountant == ["Accountant", "Accounts Payable Accountant"]
+    assert marketing == ["Marketing Specialist", "SEO Marketing Specialist"]
+    assert all("developer" not in role.casefold() for role in nurse + accountant + marketing)

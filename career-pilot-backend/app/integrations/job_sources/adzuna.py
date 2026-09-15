@@ -28,7 +28,7 @@ class AdzunaJobProvider(JobSourceAdapter):
             "app_id": self.app_id,
             "app_key": self.app_key,
             "results_per_page": min(criteria.limit, 50),
-            "what": criteria.query,
+            "what": criteria.query or "jobs",
             "content-type": "application/json",
         }
         if criteria.location:

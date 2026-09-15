@@ -48,7 +48,7 @@ class ApplicationApprove(BaseModel):
 
 class ApplicationTrack(BaseModel):
     version: int = Field(ge=1)
-    status: Literal["submitted_externally", "interview", "offer", "rejected", "withdrawn"]
+    status: Literal["applied", "interview", "offer", "rejected", "withdrawn"]
     notes: str = Field(default="", max_length=10000)
     confirmed: Literal[True]
 

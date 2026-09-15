@@ -21,7 +21,7 @@ class JoobleJobSource(JobSourceAdapter):
 
     async def search(self, criteria: JobSearchCriteria) -> list[JobResult]:
         payload = {
-            "keywords": criteria.query,
+            "keywords": criteria.query or "jobs",
             "location": criteria.location
             or ("Remote" if criteria.workplace_type == "remote" else ""),
             "page": 1,

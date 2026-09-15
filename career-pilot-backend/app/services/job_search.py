@@ -11,15 +11,12 @@ from app.core.config import settings
 from app.integrations.job_sources import (
     AdzunaJobSource,
     ArbeitnowJobSource,
-    GreenhouseJobSource,
     JobProvider,
     JobProviderResult,
     JoobleJobSource,
-    LeverJobSource,
     RemotiveJobSource,
     SerpApiJobProvider,
 )
-from app.integrations.job_sources.catalog import COMPANY_JOB_SOURCES
 from app.schemas.job import JobResult, JobSearchCriteria, JobSearchResponse
 
 logger = logging.getLogger(__name__)
@@ -36,14 +33,10 @@ class JobSearchService:
 
     @staticmethod
     def _configured_sources() -> list[JobProvider]:
-        # Public boards and company ATS feeds provide a real multi-source
-        # baseline even when no commercial provider keys are configured.
+        # These are general job boards.  Company ATS feeds remain available as
+        # adapters, but are intentionally not a default Discover source: the
+        # old catalog was a small, technology-company-only sample.
         sources: list[JobProvider] = [ArbeitnowJobSource(), RemotiveJobSource()]
-        sources.extend(
-            GreenhouseJobSource(entry) if entry.provider == "greenhouse" else LeverJobSource(entry)
-            for entry in COMPANY_JOB_SOURCES
-            if entry.enabled
-        )
         if settings.SERPAPI_API_KEY:
             sources.append(SerpApiJobProvider(settings.SERPAPI_API_KEY))
         else:
@@ -78,8 +71,9 @@ class JobSearchService:
         for source, outcome in zip(self.sources, outcomes, strict=True):
             if isinstance(outcome, Exception):
                 logger.warning(
-                    "Job source failed",
-                    extra={"job_source": source.name, "error_type": type(outcome).__name__},
+                    "Job source failed: source=%s error_type=%s",
+                    source.name,
+                    type(outcome).__name__,
                 )
                 failures.append(source.name)
             elif isinstance(outcome, JobProviderResult):
@@ -93,7 +87,7 @@ class JobSearchService:
             job.posted_at = _utc(job.posted_at)
             job.expires_at = _utc(job.expires_at)
         jobs = self._deduplicate(self._filter(jobs, criteria), authority)
-        jobs = [job for job in jobs if not job.expired]
+        jobs = [job for job in jobs if job.normalized_status not in {"closed", "expired"}]
         jobs.sort(
             key=lambda job: job.posted_at or datetime.min.replace(tzinfo=UTC),
             reverse=True,
@@ -128,6 +122,26 @@ class JobSearchService:
         cutoff = {"24h": 1, "7d": 7, "30d": 30}.get(criteria.date_posted or "")
         result = []
         for job in jobs:
+            status_text = " ".join(str(value) for value in (
+                getattr(job, "normalized_status", ""),
+                getattr(job, "source_status", ""),
+            )).casefold()
+            if any(word in status_text for word in ("closed", "expired", "removed")):
+                job.expired = "expired" in status_text
+                job.normalized_status = "expired" if job.expired else "closed"
+                continue
+            if job.expires_at and job.expires_at < datetime.now(UTC):
+                job.expired = True
+                job.normalized_status = "expired"
+                continue
+            # Default freshness window. Explicit source-confirmed active jobs are retained
+            # when providers have incomplete or imperfect posting dates.
+            if (
+                job.posted_at
+                and job.posted_at < datetime.now(UTC) - timedelta(days=60)
+                and job.normalized_status != "active"
+            ):
+                continue
             text = " ".join(
                 [job.title, job.company, job.location or "", _plain(job.description), *job.skills]
             ).casefold()
@@ -149,8 +163,6 @@ class JobSearchService:
                 not job.posted_at or job.posted_at < datetime.now(UTC) - timedelta(days=cutoff)
             ):
                 continue
-            if job.expires_at and job.expires_at < datetime.now(UTC):
-                job.expired = True
             result.append(job)
         return result
 
@@ -211,13 +223,13 @@ def _completeness(job: JobResult) -> int:
 
 
 def _location_matches(requested: str, offered: str | None) -> bool:
-    """Match place tokens while allowing explicitly worldwide remote roles."""
+    """Match the requested place; a worldwide listing is not a local listing."""
     requested_tokens = set(_tokens(requested)) - {"the"}
     offered_text = (offered or "").casefold()
     if not requested_tokens:
         return True
     if any(marker in offered_text for marker in ("worldwide", "anywhere", "global")):
-        return True
+        return False
     return bool(requested_tokens & set(_tokens(offered_text)))
 
 

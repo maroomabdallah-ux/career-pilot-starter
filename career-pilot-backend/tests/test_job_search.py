@@ -71,6 +71,13 @@ def test_bilingual_structured_search_intent(message, expected):
     assert result["query"]
 
 
+def test_arabic_accounting_search_is_domain_correct():
+    result = understand_job_search("دورلي على شغل محاسبة بعمان")
+
+    assert result["query"] == "Accountant"
+    assert result["location"] == "Amman"
+
+
 @pytest.mark.asyncio
 async def test_normalize_filter_deduplicate_relevance_and_source_fallback():
     duplicate = job(
@@ -126,7 +133,7 @@ async def test_location_remote_and_experience_filters():
 
 
 @pytest.mark.asyncio
-async def test_location_does_not_leak_unrelated_remote_jobs():
+async def test_location_does_not_treat_worldwide_as_a_local_match():
     rows = [
         job(external_id="amman", location="Amman, Jordan"),
         job(external_id="glasgow", location="Glasgow, Scotland"),
@@ -136,7 +143,7 @@ async def test_location_does_not_leak_unrelated_remote_jobs():
         JobSearchCriteria(query="Python", location="Amman")
     )
 
-    assert {item.external_id for item in result.jobs} == {"amman", "global"}
+    assert {item.external_id for item in result.jobs} == {"amman"}
 
 
 def test_default_discovery_has_multiple_real_sources_without_paid_keys(monkeypatch):
@@ -147,8 +154,32 @@ def test_default_discovery_has_multiple_real_sources_without_paid_keys(monkeypat
 
     names = [source.name for source in JobSearchService._configured_sources()]
 
-    assert {"Arbeitnow", "Remotive", "Greenhouse", "Lever"}.issubset(names)
-    assert len(names) >= 4
+    assert {"Arbeitnow", "Remotive"}.issubset(names)
+    assert not {"Greenhouse", "Lever"}.intersection(names)
+    assert len(names) >= 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("query", "title"),
+    [
+        ("Nurse", "Registered Nurse"),
+        ("Accountant", "Management Accountant"),
+        ("Backend Developer", "Backend Developer"),
+    ],
+)
+async def test_discovery_search_is_occupation_agnostic(query, title):
+    rows = [
+        job(external_id="nurse", title="Registered Nurse", description="Clinical patient care"),
+        job(external_id="accountant", title="Management Accountant", description="Financial reporting"),
+        job(external_id="backend", title="Backend Developer", description="API development"),
+    ]
+
+    result = await JobSearchService([Source("GeneralBoard", rows)]).search(
+        JobSearchCriteria(query=query)
+    )
+
+    assert [item.title for item in result.jobs] == [title]
 
 
 @pytest.mark.asyncio
@@ -200,6 +231,30 @@ async def test_job_search_graph_accepts_structured_criteria():
 
 
 @pytest.mark.asyncio
+async def test_explicit_discover_query_never_loads_profile_context():
+    class ProfileTrackingMCP(FakeMCP):
+        profile_reads = 0
+        skill_reads = 0
+
+        async def get_profile(self):
+            self.profile_reads += 1
+            return {"professional_title": "Backend Developer"}
+
+        async def get_skills(self):
+            self.skill_reads += 1
+            return [{"name": "Python"}]
+
+    mcp = ProfileTrackingMCP()
+    state = await job_search_graph.ainvoke(
+        {"prompt": "Find Nurse jobs"}, config={"configurable": {"mcp_client": mcp}}
+    )
+
+    assert state["result"]["criteria"]["query"] == "Nurse"
+    assert state["result"]["criteria"]["skills"] == []
+    assert (mcp.profile_reads, mcp.skill_reads) == (0, 0)
+
+
+@pytest.mark.asyncio
 async def test_no_configured_sources_returns_actionable_message():
     result = await JobSearchService(sources=[]).search(JobSearchCriteria(query="Python"))
 
@@ -213,3 +268,29 @@ async def test_all_provider_failures_raise_clean_service_error():
 
     with pytest.raises(RuntimeError, match="All configured job providers are unavailable"):
         await service.search(JobSearchCriteria(query="Python"))
+
+
+@pytest.mark.asyncio
+async def test_default_freshness_excludes_old_and_expired_jobs():
+    rows = [
+        job(external_id="recent"),
+        job(external_id="old", posted_at=datetime.now(UTC) - timedelta(days=61)),
+        job(external_id="expired", expires_at=datetime.now(UTC) - timedelta(days=1)),
+    ]
+    result = await JobSearchService([Source("DirectATS", rows)]).search(
+        JobSearchCriteria(query="Python")
+    )
+    assert [item.external_id for item in result.jobs] == ["recent"]
+
+
+@pytest.mark.asyncio
+async def test_source_confirmed_active_can_survive_imperfect_old_date():
+    active = job(
+        external_id="active",
+        posted_at=datetime.now(UTC) - timedelta(days=90),
+        normalized_status="active",
+    )
+    result = await JobSearchService([Source("DirectATS", [active])]).search(
+        JobSearchCriteria(query="Python")
+    )
+    assert [item.external_id for item in result.jobs] == ["active"]

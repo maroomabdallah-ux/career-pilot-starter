@@ -8,7 +8,30 @@ LEVELS = {
     "internship": ("intern", "internship", "تدريب", "متدرب"),
     "senior": ("senior", "سينيور", "خبير"),
 }
-KNOWN_LOCATIONS = ("Amman", "Jordan", "Montreal", "Canada", "Berlin", "Germany", "Europe")
+KNOWN_LOCATIONS = {
+    "amman": "Amman",
+    "عمان": "Amman",
+    "عمّان": "Amman",
+    "jordan": "Jordan",
+    "الأردن": "Jordan",
+    "الاردن": "Jordan",
+    "montreal": "Montreal",
+    "canada": "Canada",
+    "berlin": "Berlin",
+    "germany": "Germany",
+    "europe": "Europe",
+}
+
+
+def is_job_search_request(message: str) -> bool:
+    return bool(
+        re.search(
+            r"(?:\b(?:find|search|show|look for)\b.*\b(?:job|jobs|role|roles)\b|"
+            r"\bjobs?\b|وظائف|وظيفة|شغل|دورلي)",
+            message,
+            re.I,
+        )
+    )
 
 
 def understand_job_search(message: str) -> dict:
@@ -34,11 +57,15 @@ def understand_job_search(message: str) -> dict:
         if any(x in folded for x in ("this month", "30d", "هذا الشهر"))
         else None
     )
-    location = next((place for place in KNOWN_LOCATIONS if place.casefold() in folded), None)
+    location = next(
+        (canonical for alias, canonical in KNOWN_LOCATIONS.items() if alias in folded), None
+    )
     employment = next(
         (value for value in ("full-time", "part-time", "contract") if value in folded), None
     )
     query = _query(text)
+    if re.search(r"\b(محاسبة|محاسب|محاسبين)\b", query):
+        query = "Accountant"
     generic = not query or query.casefold() in {"jobs", "job", "work", "وظائف", "شغل"}
     return {
         "query": None if generic else query,
@@ -59,6 +86,10 @@ def _query(text: str) -> str:
     )
     cleaned = re.sub(r"(دورلي|ابحث|عن|وظائف|شغل|مناسب|لمهاراتي|إلي|الي|بدي)", " ", cleaned)
     cleaned = re.sub(
-        r"\b(Amman|Jordan|Montreal|Canada|Berlin|Germany|Europe)\b", " ", cleaned, flags=re.I
+        r"\b(Amman|Jordan|Montreal|Canada|Berlin|Germany|Europe)\b|"
+        r"(?:ب|في\s*)?(?:عمان|عمّان|الأردن|الاردن)",
+        " ",
+        cleaned,
+        flags=re.I,
     )
     return " ".join(cleaned.split())[:200]

@@ -3411,6 +3411,107 @@ body:before {
   }
 }
 
+/* Premium CV-first profile entry */
+.profile-entry {
+  min-height: 100vh;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: clamp(24px, 4vw, 64px);
+  color: #fff;
+  background:
+    linear-gradient(120deg, rgba(7, 27, 48, 0.1), rgba(7, 27, 48, 0.78)),
+    radial-gradient(circle at 17% 18%, rgba(55, 151, 255, 0.24), transparent 30%),
+    #071b30;
+}
+.profile-entry:before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  opacity: 0.13;
+  background-image: linear-gradient(rgba(255,255,255,.18) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.18) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(90deg, #000, transparent 70%);
+}
+.profile-entry-orb { position: absolute; z-index: -1; border-radius: 50%; filter: blur(1px); pointer-events: none; }
+.profile-entry-orb-one { width: 520px; height: 520px; top: -310px; right: -120px; border: 1px solid rgba(111,190,255,.15); box-shadow: 0 0 0 90px rgba(47,139,230,.025), 0 0 0 180px rgba(47,139,230,.018); }
+.profile-entry-orb-two { width: 260px; height: 260px; left: -130px; bottom: -100px; background: rgba(36,131,224,.12); filter: blur(30px); }
+.profile-entry-shell {
+  width: min(1320px, 100%);
+  min-height: min(790px, calc(100vh - 80px));
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(420px, .72fr);
+  grid-template-rows: auto 1fr;
+  column-gap: clamp(60px, 8vw, 130px);
+  padding: clamp(34px, 5vw, 72px);
+  border: 1px solid rgba(160, 208, 248, 0.16);
+  border-radius: 34px;
+  background: linear-gradient(135deg, rgba(14, 48, 80, .58), rgba(7, 27, 48, .86));
+  box-shadow: 0 50px 130px rgba(0, 8, 20, .38), inset 0 1px rgba(255,255,255,.05);
+  backdrop-filter: blur(20px);
+}
+.profile-entry-brand { grid-column: 1 / -1; display: flex; align-items: center; gap: 11px; height: fit-content; }
+.profile-entry-brand strong { font-size: 18px; letter-spacing: -.025em; }
+.profile-entry-brand small { padding-left: 12px; border-left: 1px solid rgba(255,255,255,.18); color: #87a9c8; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+.profile-entry-mark { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 12px; background: linear-gradient(145deg, #4da7fb, #176fe8); box-shadow: 0 10px 28px rgba(29, 120, 231, .35); }
+.profile-entry-copy { align-self: center; max-width: 660px; padding-bottom: 18px; }
+.profile-entry-kicker { display: inline-flex; align-items: center; gap: 8px; color: #79bcfa; font-size: 10px; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
+.profile-entry-copy h1 { margin: 22px 0; max-width: 650px; font-size: clamp(48px, 5vw, 76px); line-height: .98; letter-spacing: -.065em; text-wrap: balance; }
+.profile-entry-copy > p { max-width: 570px; color: #afc7dc; font-size: 15px; line-height: 1.8; }
+.profile-entry-signals { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 32px; color: #d7e8f7; font-size: 11px; }
+.profile-entry-signals span { display: flex; align-items: center; gap: 7px; }
+.profile-entry-signals svg { color: #61b1fa; }
+.profile-entry-action { align-self: center; padding: clamp(28px, 3vw, 42px); border: 1px solid rgba(210,230,247,.9); border-radius: 28px; color: #102641; background: rgba(255,255,255,.985); box-shadow: 0 34px 90px rgba(0,8,24,.32); }
+.profile-entry-action-head { display: flex; align-items: center; gap: 15px; margin-bottom: 28px; }
+.profile-entry-action-head > span { color: #2b83e5; font: 800 11px/1 inherit; letter-spacing: .12em; }
+.profile-entry-action-head div { display: grid; gap: 4px; padding-left: 15px; border-left: 1px solid #dce7f0; }
+.profile-entry-action-head small { color: #8093a7; font-size: 8px; font-weight: 800; letter-spacing: .14em; }
+.profile-entry-action-head strong { font-size: 20px; letter-spacing: -.035em; }
+.profile-upload-card, .profile-manual-card { width: 100%; min-height: 104px; display: grid; grid-template-columns: 54px 1fr auto; align-items: center; gap: 16px; padding: 18px; border-radius: 20px; cursor: pointer; text-align: left; transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease; }
+.profile-upload-card { border: 1px solid #77b8fa; color: #fff; background: linear-gradient(135deg, #176fe8, #2d8bea); box-shadow: 0 18px 40px rgba(23,111,232,.24); }
+.profile-manual-card { border: 1px solid #dce7f0; color: #17304d; background: #f7faff; }
+.profile-upload-card:hover, .profile-manual-card:hover { transform: translateY(-3px); }
+.profile-upload-card:hover { box-shadow: 0 24px 48px rgba(23,111,232,.32); }
+.profile-manual-card:hover { border-color: #9dc8f1; box-shadow: 0 16px 35px rgba(30,80,130,.1); }
+.profile-upload-icon { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; background: rgba(255,255,255,.14); }
+.profile-manual-card .profile-upload-icon { color: #247cda; background: #e7f2fd; }
+.profile-upload-copy { display: grid; gap: 6px; }
+.profile-upload-copy strong { font-size: 15px; letter-spacing: -.02em; }
+.profile-upload-copy small { color: rgba(255,255,255,.72); font-size: 9px; line-height: 1.5; }
+.profile-manual-card .profile-upload-copy small { color: #7b8da1; }
+.profile-entry-divider { display: flex; align-items: center; gap: 12px; margin: 17px 0; color: #9babb9; font-size: 9px; text-transform: uppercase; }
+.profile-entry-divider:before, .profile-entry-divider:after { content: ""; height: 1px; flex: 1; background: #e5edf4; }
+.profile-entry-footnote { display: flex; justify-content: center; align-items: center; gap: 6px; margin: 23px 0 0; color: #8798a9; font-size: 8px; text-align: center; }
+@media (max-width: 900px) { .profile-entry-shell { grid-template-columns: 1fr; row-gap: 45px; } .profile-entry-copy { padding-top: 60px; } .profile-entry-action { width: 100%; max-width: 560px; } }
+@media (max-width: 600px) { .profile-entry { padding: 0; } .profile-entry-shell { min-height: 100vh; padding: 24px 20px 36px; border: 0; border-radius: 0; } .profile-entry-brand small { display: none; } .profile-entry-copy { padding-top: 34px; } .profile-entry-copy h1 { font-size: 43px; } .profile-entry-copy > p { font-size: 13px; } .profile-entry-signals { margin-top: 22px; } .profile-entry-action { padding: 23px 18px; border-radius: 24px; } .profile-upload-card, .profile-manual-card { grid-template-columns: 48px 1fr auto; gap: 12px; padding: 14px; } .profile-upload-icon { width: 46px; height: 46px; } }
+
+/* CV review is a dedicated workspace, not a narrow onboarding step. */
+.profile-review { min-height: 100vh; padding: 0 28px 60px; color: #16304e; background: radial-gradient(circle at 8% 0, #dcefff, transparent 28%), #f5f9fc; }
+.profile-review-topbar { width: min(1240px, 100%); height: 88px; margin: auto; display: flex; align-items: center; justify-content: space-between; }
+.profile-review-brand { display: flex; align-items: center; gap: 10px; color: #102946; font-size: 17px; letter-spacing: -.025em; }
+.profile-review-brand span { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 11px; color: #fff; background: linear-gradient(145deg,#4da7fb,#176fe8); }
+.profile-review-back, .profile-review-subtle { border: 0; color: #55718d; background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.profile-review-back { display: inline-flex; align-items: center; gap: 7px; padding: 10px 0; }
+.profile-review-shell { width: min(1240px, 100%); margin: 14px auto 0; }
+.profile-review-hero { display: flex; align-items: end; justify-content: space-between; gap: 40px; margin-bottom: 40px; }
+.profile-review-hero h1 { max-width: 700px; margin: 13px 0; color: #102946; font-size: clamp(38px,5vw,62px); line-height: 1; letter-spacing: -.06em; }
+.profile-review-hero h1 em { color: #287fe3; font-style: normal; }
+.profile-review-hero p { max-width: 640px; margin: 0; color: #678099; font-size: 13px; line-height: 1.7; }
+.profile-review-trust { min-width: 230px; display: flex; align-items: center; gap: 12px; padding: 15px 17px; border: 1px solid #d8e6f1; border-radius: 16px; background: rgba(255,255,255,.72); }
+.profile-review-trust svg { color: #2581e5; }.profile-review-trust span { display: grid; gap: 3px; }.profile-review-trust strong { font-size: 11px; }.profile-review-trust small { color: #7890a5; font-size: 9px; }
+.profile-review-grid { display: grid; grid-template-columns: minmax(0, 1fr) 315px; gap: 28px; align-items: start; }
+.profile-review-data { display: grid; gap: 14px; }
+.profile-review-section { overflow: hidden; border: 1px solid #dce8f2; border-radius: 19px; background: #fff; box-shadow: 0 10px 30px rgba(24,69,110,.045); }
+.profile-review-section > header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid #edf2f6; }
+.profile-review-section > header > div { display: flex; align-items: center; gap: 13px; }.profile-review-section > header > div > span { color: #2b83e5; font-size: 10px; font-weight: 800; letter-spacing: .1em; }.profile-review-section h2 { margin: 0; font-size: 15px; letter-spacing: -.025em; }.profile-review-section header p { margin: 3px 0 0; color: #8195a7; font-size: 9px; }.profile-review-section header > small { color: #7e93a6; font-size: 8px; }.profile-review-section header > small.is-empty { color: #a7b5c1; }
+.profile-review-items { display: flex; flex-wrap: wrap; gap: 9px; padding: 15px 20px; }.profile-review-items label { min-width: min(100%, 230px); flex: 1 1 230px; display: flex; align-items: center; border: 1px solid #dae7f1; border-radius: 11px; background: #f9fbfd; overflow: hidden; }.profile-review-items input { width: 100%; min-width: 0; padding: 10px 11px; border: 0; outline: 0; color: #1d3855; background: transparent; font: inherit; font-size: 10px; }.profile-review-items input:focus { background: #fff; box-shadow: inset 0 0 0 1px #4b9aef; }.profile-review-items button { width: 34px; align-self: stretch; display: grid; place-items: center; border: 0; border-left: 1px solid #e0eaf2; color: #8499aa; background: transparent; cursor: pointer; }.profile-review-items button:hover { color: #d34c52; background: #fff4f4; }.profile-review-empty { margin: 0; padding: 17px 20px; color: #98a9b7; font-size: 10px; }
+.profile-review-contact-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 18px 20px 20px; }.profile-review-contact-fields label { display: grid; gap: 7px; }.profile-review-contact-fields label:last-child { grid-column: span 2; }.profile-review-contact-fields span { color: #71879b; font-size: 9px; font-weight: 750; }.profile-review-contact-fields input { width: 100%; height: 42px; padding: 0 12px; border: 1px solid #d8e5ef; border-radius: 10px; outline: 0; color: #193550; background: #f9fbfd; font: inherit; font-size: 10px; }.profile-review-contact-fields input:focus { border-color: #4c9dec; background: #fff; box-shadow: 0 0 0 3px rgba(51,139,231,.1); }.profile-review-contact-fields input::placeholder { color: #a6b5c2; }
+.profile-review-summary { position: sticky; top: 24px; padding: 27px; border: 1px solid #bcdaf7; border-radius: 21px; color: #fff; background: linear-gradient(150deg,#176fe8,#287fdf); box-shadow: 0 22px 50px rgba(29,111,225,.23); }.profile-review-summary .profile-entry-kicker { color: #cce7ff; }.profile-review-summary h2 { margin: 15px 0 9px; font-size: 23px; line-height: 1.1; letter-spacing: -.045em; }.profile-review-summary > p:not(.profile-entry-footnote) { margin: 0; color: #d3e7fc; font-size: 10px; line-height: 1.6; }.profile-review-missing { display: grid; gap: 6px; margin: 21px 0; padding: 13px; border-radius: 12px; color: #174c83; background: #eaf5ff; }.profile-review-missing strong { font-size: 9px; }.profile-review-missing span { font-size: 9px; }.profile-review-summary .button { width: 100%; margin-top: 23px; justify-content: center; color: #176fe8; background: #fff; }.profile-review-subtle { width: 100%; margin-top: 13px; color: #d7eaff; }.profile-review-summary .profile-entry-footnote { justify-content: center; margin-top: 20px; color: #cbe4fb; }
+@media (max-width: 800px) { .profile-review { padding: 0 18px 36px; }.profile-review-hero { display: grid; gap: 20px; }.profile-review-grid { grid-template-columns: 1fr; }.profile-review-summary { position: static; }.profile-review-trust { width: fit-content; }.profile-review-items label { flex-basis: 100%; }.profile-review-contact-fields { grid-template-columns: 1fr; }.profile-review-contact-fields label:last-child { grid-column: auto; } }
+
 .onboarding-account-card {
   max-width: 620px;
   margin-bottom: 24px;
@@ -6741,6 +6842,63 @@ html {
 .agent-message.error {
   background: #fff4f4;
   color: #a84747;
+}
+.agent-message.job_search {
+  width: 100%;
+  max-width: 100%;
+  background: transparent;
+  padding: 0;
+}
+.agent-message.job_search > p {
+  padding: 9px 11px;
+  border-radius: 11px;
+  background: #eef5fd;
+}
+.agent-job-results {
+  display: grid;
+  gap: 8px;
+  margin-top: 9px;
+  min-width: 0;
+}
+.agent-job-card {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 11px;
+  text-align: left;
+  color: #203b5c;
+  background: linear-gradient(145deg, #fff, #f4f9ff);
+  border: 1px solid #d5e5f5;
+  border-radius: 12px;
+}
+.agent-job-card:hover {
+  border-color: #82b6ef;
+  box-shadow: 0 7px 18px rgba(31, 91, 158, 0.1);
+}
+.agent-job-card strong {
+  font-size: 12px;
+  line-height: 1.3;
+}
+.agent-job-card > span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.agent-job-company { color: #526b89; }
+.agent-job-meta { flex-wrap: wrap; color: #71849a; }
+.agent-job-meta small { display: inline-flex; align-items: center; gap: 3px; }
+.agent-job-skills { color: #276bb7; overflow-wrap: anywhere; }
+.agent-job-view { margin-top: 3px; color: #1769d2; font-weight: 800; }
+.agent-view-all {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #b8d5f3;
+  border-radius: 10px;
+  background: #eaf4ff;
+  color: #1769d2;
+  font-weight: 800;
 }
 .agent-proposal {
   display: grid;

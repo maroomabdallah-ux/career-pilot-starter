@@ -5,8 +5,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.job import JobResult, JobSearchCriteria
+
 
 class ProfileIntent(StrEnum):
+    JOB_SEARCH = "job_search"
     GREETING = "greeting"
     GENERAL_CONVERSATION = "general_conversation"
     READ_PROFILE = "read_profile"
@@ -71,3 +74,6 @@ class AgentResponse(BaseModel):
     thread_id: str
     proposal: Proposal | None = None
     requires_approval: bool = False
+    jobs: list[JobResult] = Field(default_factory=list)
+    search_criteria: JobSearchCriteria | None = None
+    has_more_jobs: bool = False
