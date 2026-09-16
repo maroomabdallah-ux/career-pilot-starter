@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -48,14 +49,19 @@ class SerpApiJobProvider(JobProvider):
             if not isinstance(payload, dict):
                 raise ValueError("SerpApi returned an invalid response")
             if payload.get("error"):
-                raise ValueError("SerpApi rejected the job search request")
+                raise ValueError(f"SerpApi rejected the job search request: {payload['error']}")
             return payload
 
         if self.client:
             payload = await fetch(self.client)
         else:
-            async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
-                payload = await fetch(client)
+            async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+                try:
+                    payload = await fetch(client)
+                except (httpx.ConnectTimeout, httpx.ReadTimeout):
+                    logger.warning("SerpApi timed out; retrying job search once")
+                    await asyncio.sleep(1)
+                    payload = await fetch(client)
         rows = payload.get("jobs_results") or []
         if not isinstance(rows, list):
             raise ValueError("SerpApi returned invalid job results")

@@ -23,10 +23,6 @@ class Settings(BaseSettings):
     MCP_AUTH_ISSUER_URL: str = "http://localhost:8000"
     MCP_HOST: str = "127.0.0.1"
     MCP_PORT: int = 8001
-    ADZUNA_APP_ID: str | None = None
-    ADZUNA_APP_KEY: str | None = None
-    ADZUNA_COUNTRY: str = "gb"
-    JOOBLE_API_KEY: str | None = None
     SERPAPI_API_KEY: str | None = None
     STRIPE_SECRET_KEY: str | None = None
     STRIPE_WEBHOOK_SECRET: str | None = None

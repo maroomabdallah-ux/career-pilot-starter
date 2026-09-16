@@ -1026,3 +1026,65 @@
   border-radius: 10px;
   resize: vertical;
 }
+/* Unified jobs feed */
+.cp-feed-page { max-width: 1600px; }
+.cp-feed-header-links { display: flex; gap: 10px; flex-wrap: wrap; }
+.cp-unified-grid { display: grid; grid-template-columns: minmax(210px, 250px) minmax(300px, 1fr) minmax(340px, 0.95fr); gap: 18px; align-items: start; }
+.cp-feed-filters, .cp-feed-list, .cp-unified-grid > .cp-job-details { background: #fff; border: 1px solid #dae7f4; border-radius: 16px; }
+.cp-feed-filters { position: sticky; top: 18px; padding: 20px; }
+.cp-feed-filters form { display: flex; flex-direction: column; gap: 13px; }
+.cp-feed-filters h2 { display: flex; align-items: center; gap: 9px; margin: 0 0 5px; color: #163a61; font-size: 16px; }
+.cp-feed-filters label { display: grid; gap: 6px; font-size: 11px; font-weight: 700; color: #4d6986; }
+.cp-feed-filters input, .cp-feed-filters select { min-width: 0; width: 100%; padding: 10px 11px; border: 1px solid #d7e4f1; border-radius: 8px; color: #173a60; background: #fbfdff; font-size: 12px; }
+.cp-feed-filters .button { width: 100%; justify-content: center; }
+.cp-feed-list { min-width: 0; max-height: calc(100vh - 110px); overflow-y: auto; padding: 16px; }
+.cp-feed-list-head { padding: 4px 5px 14px; border-bottom: 1px solid #e6eef7; margin-bottom: 12px; }
+.cp-feed-list-head h2 { margin: 0; font-size: 20px; color: #173a60; }
+.cp-feed-list-head p { margin: 5px 0 0; font-size: 12px; color: #66809a; }
+.cp-feed-list .cp-job-card { margin-bottom: 10px; }
+.cp-unified-grid > .cp-job-details { position: sticky; top: 18px; max-height: calc(100vh - 110px); overflow-y: auto; }
+.cp-source-line { color: #557798; font-size: 11px; margin: 10px 0; }
+.cp-description p { white-space: pre-wrap; }
+.cp-description + .cp-small-note a { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 1100px) { .cp-unified-grid { grid-template-columns: minmax(190px, 230px) minmax(0, 1fr); } .cp-unified-grid > .cp-job-details { grid-column: 2; position: static; max-height: none; } }
+@media (max-width: 720px) { .cp-unified-grid { display: flex; flex-direction: column; } .cp-feed-filters, .cp-feed-list, .cp-unified-grid > .cp-job-details { width: 100%; position: static; max-height: none; } .cp-feed-filters form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); } .cp-feed-filters h2 { grid-column: 1 / -1; } .cp-unified-grid > .cp-job-details:not(.cp-detail-empty) { order: 2; } .cp-feed-list { order: 1; } .cp-feed-filters { order: 0; } }
+@media (max-width: 480px) { .cp-feed-filters form { display: flex; } .cp-feed-header-links { width: 100%; } }
+.cp-unified-grid.cp-saved-grid { grid-template-columns: minmax(300px, 1fr) minmax(340px, 0.9fr); }
+@media (max-width: 720px) { .cp-unified-grid.cp-saved-grid { display: flex; } }
+/* Roomier two-column browsing layout */
+.cp-feed-page { max-width: none; width: 100%; }
+.cp-feed-page .cp-page-header { margin: 0 0 20px; gap: 20px; }
+.cp-feed-page .cp-page-header h1 { font-size: clamp(25px, 2.3vw, 34px); margin: 5px 0; }
+.cp-feed-page .cp-page-header p { font-size: 13px; }
+.cp-feed-search { display: grid; grid-template-columns: minmax(260px, 1.4fr) minmax(180px, .7fr) auto auto; align-items: stretch; gap: 10px; margin-bottom: 18px; padding: 12px; border: 1px solid #dae7f4; border-radius: 15px; background: white; }
+.cp-feed-search > label { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 0 13px; border: 1px solid #d7e4f1; border-radius: 9px; color: #557798; }
+.cp-feed-search input { width: 100%; min-width: 0; border: 0; outline: 0; padding: 11px 0; color: #173a60; background: transparent; }
+.cp-feed-search > .button { display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; }
+.cp-feed-advanced { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px; align-items: end; padding: 12px 2px 2px; border-top: 1px solid #e6eef7; }
+.cp-feed-advanced label { flex: 1 1 170px; display: grid; gap: 6px; color: #526e89; font-size: 11px; font-weight: 700; }
+.cp-feed-advanced input, .cp-feed-advanced select { min-width: 0; width: 100%; padding: 10px 11px; border: 1px solid #d7e4f1; border-radius: 8px; background: #fbfdff; color: #173a60; }
+.cp-feed-advanced .cp-text-button { flex: 0 0 auto; padding: 10px; }
+.cp-unified-grid, .cp-unified-grid.cp-saved-grid { grid-template-columns: minmax(370px, .9fr) minmax(460px, 1.1fr); gap: 18px; }
+.cp-feed-list { max-height: none; overflow: visible; padding: 18px; }
+.cp-unified-grid > .cp-job-details { max-height: calc(100vh - 45px); top: 16px; }
+.cp-feed-list .cp-job-card { padding: 18px; }
+@media (max-width: 1050px) { .cp-unified-grid, .cp-unified-grid.cp-saved-grid { grid-template-columns: minmax(300px, 1fr) minmax(360px, 1fr); } .cp-unified-grid > .cp-job-details { grid-column: auto; position: sticky; max-height: calc(100vh - 45px); } }
+@media (max-width: 780px) { .cp-feed-search { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .cp-unified-grid, .cp-unified-grid.cp-saved-grid { display: flex; flex-direction: column; } .cp-unified-grid > .cp-job-details { width: 100%; position: static; max-height: none; } }
+@media (max-width: 540px) { .cp-feed-search { grid-template-columns: 1fr; } .cp-feed-search > .button { width: 100%; } .cp-feed-page .cp-page-header { align-items: flex-start; } }
+/* Compact, scannable job rows */
+.cp-feed-list { padding: 12px; }
+.cp-feed-list .cp-job-card { padding: 12px 14px; margin-bottom: 7px; border-radius: 10px; box-shadow: none; animation: none; }
+.cp-feed-list .cp-job-card:hover { transform: none; box-shadow: 0 3px 12px rgba(38, 74, 121, .08); }
+.cp-feed-list .cp-card-heading { gap: 9px; }
+.cp-feed-list .cp-company-logo { width: 34px; height: 34px; border-radius: 8px; font-size: 11px; }
+.cp-feed-list .cp-company-name { margin-bottom: 1px; font-size: 10px; }
+.cp-feed-list .cp-title-button { font-size: 12px !important; line-height: 1.25; }
+.cp-feed-list .cp-job-meta { margin: 7px 0 0; gap: 4px 10px; font-size: 10px; }
+.cp-feed-list .cp-source-line { font-size: 10px; margin: 5px 0 0; }
+.cp-feed-list .cp-skill-chips { display: none; }
+.cp-feed-list .cp-salary { font-size: 10px; margin: 5px 0 0; }
+.cp-feed-list .cp-card-actions { margin-top: 7px; padding-top: 6px; }
+.cp-feed-list .cp-card-actions button { font-size: 10px; padding-top: 3px; padding-bottom: 3px; }
+.cp-feed-list .cp-card-actions > div { gap: 9px; }
+.cp-load-more { display: flex; justify-content: center; padding: 16px 0 8px; }
+.cp-load-more .button { min-width: 180px; }

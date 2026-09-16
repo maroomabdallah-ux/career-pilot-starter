@@ -91,7 +91,7 @@ export const careerApi = {
     apiClient.post(`/resumes/${id}/export`, null, { responseType: "blob" }),
   searchJobs: (payload) => data(apiClient.post("/jobs/search", payload)),
   searchJobsPage: (params, signal) =>
-    data(apiClient.get("/jobs/search", { params, signal })),
+    data(apiClient.get("/jobs/search", { params, signal, timeout: 90000 })),
   listApplications: () => data(apiClient.get("/applications")),
   getApplication: (id) => data(apiClient.get(`/applications/${id}`)),
   createApplication: (job) => data(apiClient.post("/applications", { job })),

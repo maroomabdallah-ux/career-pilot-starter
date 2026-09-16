@@ -1,118 +1,69 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import {
-  ArrowRight,
-  Bookmark,
-  Search,
-  MapPin,
-  Sparkles,
-  SlidersHorizontal,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-} from "lucide-react";
+import { Bookmark, Search, RefreshCw, SlidersHorizontal } from "lucide-react";
 import { careerApi, apiErrorMessage } from "../services/careerApi";
 import { JobCard, JobDetails, jobKey } from "../features/jobs/JobComponents";
 import "../features/jobs/workspace.css";
 
-export default function JobsPage() {
+const PAGE_SIZE = 20;
+const initialFilters = { q: "", location: "", country: "", workplace_type: "", date_posted: "", experience_level: "", employment_type: "" };
+
+export default function JobsPage({ savedOnly = false }) {
   const navigate = useNavigate();
-  const routeLocation = useLocation();
-  const agentSearch = routeLocation.state?.jobSearch;
-  const [tab, setTab] = useState(agentSearch ? "discover" : "recommended");
+  const route = useLocation();
+  const incoming = route.state?.jobSearch;
+  const [draft, setDraft] = useState({ ...initialFilters, ...incoming });
+  const [criteria, setCriteria] = useState({ ...initialFilters, ...incoming });
+  const [page, setPage] = useState(1);
   const [feed, setFeed] = useState(null);
   const [saved, setSaved] = useState([]);
-  const [profile, setProfile] = useState(null);
-  const [selected, setSelected] = useState(routeLocation.state?.selectedJob || null);
-  const [pendingJobKey, setPendingJobKey] = useState(routeLocation.state?.selectedJobKey || null);
-  const [query, setQuery] = useState(agentSearch?.query || "");
-  const [location, setLocation] = useState(agentSearch?.location || "");
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [params, setParams] = useState(() => agentSearch ? ({
-    q: agentSearch.query,
-    location: agentSearch.location,
-    page: 1,
-    page_size: 10,
-    mode: "discover",
-  }) : ({ page: 1, page_size: 10, mode: "recommended" }));
-  const [filter, setFilter] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(route.state?.selectedJob || null);
+  const [pendingKey, setPendingKey] = useState(route.state?.selectedJobKey || null);
+  const [loading, setLoading] = useState(!savedOnly);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(null);
-  const [skipped, setSkipped] = useState(new Set());
-  const [savedPage, setSavedPage] = useState(1);
-  const actionLock = useRef(false);
-  const firstLoad = useRef(true);
+  const [busy, setBusy] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const [expanded, setExpanded] = useState(false);
+  const requestId = useRef(0);
 
   useEffect(() => {
-    careerApi
-      .listSavedJobs()
-      .then(setSaved)
-      .catch(() =>
-        setNotice("Saved jobs could not be loaded. Refresh to try again."),
-      );
+    careerApi.listSavedJobs().then(setSaved).catch((err) => setNotice(`Saved jobs unavailable: ${apiErrorMessage(err)}`));
   }, []);
   useEffect(() => {
-    careerApi.getProfile().then(setProfile).catch(() => setProfile(null));
-  }, []);
+    if (!route.state?.jobSearch && !route.state?.selectedJob) return;
+    const next = { ...initialFilters, ...route.state.jobSearch };
+    setDraft(next); setFeed(null); setExpanded(false); setCriteria(next); setPage(1);
+    setSelected(route.state.selectedJob || null);
+    setPendingKey(route.state.selectedJobKey || null);
+    navigate(route.pathname, { replace: true, state: null });
+  }, [route.state, route.pathname, navigate]);
   useEffect(() => {
-    if (!routeLocation.state?.jobSearch) return;
-    const requested = routeLocation.state.jobSearch;
-    setTab("discover");
-    setQuery(requested.query || "");
-    setLocation(requested.location || "");
-    setSelected(routeLocation.state.selectedJob || null);
-    setPendingJobKey(routeLocation.state.selectedJobKey || null);
-    setParams({
-      q: requested.query || "",
-      location: requested.location || "",
-      workplace_type: requested.workplace_type,
-      employment_type: requested.employment_type,
-      page: 1,
-      page_size: 10,
-      mode: "discover",
-    });
-    navigate(routeLocation.pathname, { replace: true, state: null });
-  }, [navigate, routeLocation.pathname, routeLocation.state]);
-  useEffect(() => {
+    if (savedOnly) return;
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-    setSelected(null);
-    careerApi
-      .searchJobsPage(params, controller.signal)
+    const id = ++requestId.current;
+    setLoading(true); setError(null);
+    const params = Object.fromEntries(Object.entries(criteria).filter(([, value]) => value));
+    careerApi.searchJobsPage({ ...params, page, page_size: PAGE_SIZE, mode: "feed", expand: expanded }, controller.signal)
       .then((result) => {
-        setFeed(result);
-        if (pendingJobKey) {
-          const requestedJob = result.jobs.find((job) => jobKey(job) === pendingJobKey);
-          if (requestedJob) setSelected(requestedJob);
-          setPendingJobKey(null);
-        }
-        if (firstLoad.current) {
-          setLocation(result.search_location || "");
-          firstLoad.current = false;
-        }
+        if (requestId.current !== id) return;
+        setFeed((previous) => (page === 1 && !expanded) || !previous ? result : {
+          ...result,
+          jobs: [...previous.jobs, ...result.jobs.filter((job) => !previous.jobs.some((existing) => jobKey(existing) === jobKey(job)))],
+        });
+        if (page === 1) setSelected((current) => result.jobs.find((job) => jobKey(job) === (pendingKey || (current && jobKey(current)))) || (pendingKey ? current : result.jobs[0] || null));
+        setPendingKey(null);
       })
-      .catch((err) => {
-        if (err.code !== "ERR_CANCELED") setError(err);
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
+      .catch((err) => { if (err.code !== "ERR_CANCELED" && requestId.current === id) setError(err); })
+      .finally(() => { if (!controller.signal.aborted && requestId.current === id) setLoading(false); });
     return () => controller.abort();
-  }, [params]);
+  }, [criteria, page, retry, savedOnly, expanded]);
 
-  const savedFor = (job) =>
-    saved.find(
-      (item) =>
-        item.source === job.source && item.external_job_id === job.external_id,
-    );
+  const savedFor = (job) => saved.find((item) => item.source === job.source && item.external_job_id === job.external_id);
   const act = async (job, operation) => {
-    if (actionLock.current) return;
-    actionLock.current = true;
-    setBusy(jobKey(job));
-    setNotice("");
+    if (!job || busy) return;
+    setBusy(true); setNotice("");
     try {
       if (operation === "apply") {
         const application = await careerApi.createApplication(job);
@@ -121,388 +72,54 @@ export default function JobsPage() {
         const current = savedFor(job);
         if (current) {
           await careerApi.unsaveJob(current.id);
-          setSaved((items) => items.filter((x) => x.id !== current.id));
+          setSaved((items) => items.filter((item) => item.id !== current.id));
           setNotice("Removed from saved jobs.");
         } else {
           const item = await careerApi.saveJob(job);
-          setSaved((items) => [...items.filter((x) => x.id !== item.id), item]);
-          setNotice("Job saved. You can return to it anytime.");
+          setSaved((items) => [...items, item]);
+          setNotice("Job saved.");
         }
       }
-    } catch (err) {
-      setNotice(apiErrorMessage(err));
-    } finally {
-      actionLock.current = false;
-      setBusy(null);
-    }
+    } catch (err) { setNotice(apiErrorMessage(err)); }
+    finally { setBusy(false); }
   };
-  const search = (event) => {
-    event.preventDefault();
-    setTab("discover");
-    setSkipped(new Set());
-    setParams({
-      q: query.trim(),
-      location: location.trim(),
-      page: 1,
-      page_size: 10,
-      mode: "discover",
-      workplace_type: filter === "remote" ? "remote" : undefined,
-      employment_type: filter && filter !== "remote" ? filter : undefined,
-    });
-  };
-  const applyRecommendedFilters = (event) => {
-    event.preventDefault();
-    setTab("recommended");
-    setSkipped(new Set());
-    setParams({
-      q: query.trim(),
-      location: location.trim(),
-      page: 1,
-      page_size: 10,
-      mode: "recommended",
-    });
-  };
-  const suggestedRoles = [
-    profile?.professional_title,
-    ...(profile?.target_roles || []),
-  ].filter((role, index, items) => role && items.indexOf(role) === index);
-  const suggestedLocations = [
-    ...(profile?.preferred_locations || []),
-    [profile?.city, profile?.country].filter(Boolean).join(", "),
-  ].filter((place, index, items) => place && items.indexOf(place) === index);
-  const allSaved = saved.map((item) => item.snapshot);
-  const savedPages = Math.max(1, Math.ceil(allSaved.length / 10));
-  const page =
-    tab === "saved" ? Math.min(savedPage, savedPages) : feed?.page || 1;
-  const jobs =
-    tab === "saved"
-      ? allSaved.slice((page - 1) * 10, page * 10)
-      : feed?.jobs || [];
-  const visible = jobs.filter((job) => !skipped.has(jobKey(job)));
-  const pages = tab === "saved" ? savedPages : feed?.total_pages || 1;
-  const move = (target) => {
-    setSelected(null);
-    tab === "saved"
-      ? setSavedPage(target)
-      : setParams((old) => ({ ...old, page: target }));
-  };
-  const changeTab = (value) => {
-    setTab(value);
-    setSelected(null);
-    if (value === "recommended") {
-      setParams({ page: 1, page_size: 10, mode: "recommended" });
-    } else if (value === "discover" && params.mode !== "discover") {
-      // Discover is an immediate, unpersonalized job feed. Never carry the
-      // location, role, or work-mode values from the personalized tab.
-      setQuery("");
-      setLocation("");
-      setFilter("");
-      firstLoad.current = false;
-      setParams({ page: 1, page_size: 10, mode: "discover", q: "" });
-    }
-  };
-
-  return (
-    <main className="page cp-workspace">
-      <header className="cp-page-header">
-        <div>
-          <span className="cp-eyebrow">
-            <Sparkles size={14} /> YOUR CAREER, IN FOCUS
-          </span>
-          <h1>
-            Find your next chapter<span>.</span>
-          </h1>
-          <p>
-            Opportunities shaped around your experience, skills, and ambitions.
-          </p>
-        </div>
-        <Link className="button secondary" to="/app/applications">
-          My applications <ArrowRight size={16} />
-        </Link>
-      </header>
-      <section className="cp-context-bar">
-        <div className="cp-context-icon">
-          <Sparkles size={21} />
-        </div>
-        <div>
-          <strong>
-            {tab === "recommended" && feed?.context_sources?.length
-              ? "Your career profile is guiding the search"
-              : tab === "discover"
-                ? "Search across careers and industries"
-                : "Let’s find your next opportunity"}
-          </strong>
-          <p>
-            {tab === "recommended" && feed?.context_sources?.length
-              ? `Using ${feed.context_sources.join(" + ")} · ${feed.search_query || "Your preferred roles"}`
-              : tab === "discover"
-                ? "Search any profession, occupation, company, or keyword without profile filters."
-                : "Add skills or a resume to get more personal recommendations."}
-          </p>
-        </div>
-        <span className="cp-location-pill">
-          <MapPin size={14} />
-          {feed?.search_location || "Open to locations"}
-        </span>
-        <Link to="/app/profile">
-          Update profile <ArrowRight size={14} />
-        </Link>
+  const update = (name) => (event) => setDraft((old) => ({ ...old, [name]: event.target.value }));
+  const search = (event) => { event.preventDefault(); setFeed(null); setExpanded(false); setPage(1); setCriteria({ ...draft }); };
+  const savedJobs = saved.map((item) => item.snapshot);
+  const savedPages = Math.max(1, Math.ceil(savedJobs.length / PAGE_SIZE));
+  const jobs = savedOnly ? savedJobs.slice(0, page * PAGE_SIZE) : feed?.jobs || [];
+  const hasMore = savedOnly ? page < savedPages : !!feed && (feed.has_next || (!expanded && !criteria.q));
+  return <main className="page cp-workspace cp-feed-page">
+    <header className="cp-page-header"><div><span className="cp-eyebrow">CAREERPILOT JOBS</span><h1>{savedOnly ? "Saved jobs" : "Find your next opportunity"}</h1><p>{savedOnly ? "Your shortlist, ready when you are." : "Explore real jobs across every profession, with your strongest matches first."}</p></div>
+      <div className="cp-feed-header-links"><Link className="button secondary" to={savedOnly ? "/app/jobs" : "/app/jobs/saved"}>{savedOnly ? "Browse jobs" : <>Saved jobs <Bookmark size={15} /> {saved.length}</>}</Link><Link className="button secondary" to="/app/applications">My applications</Link></div>
+    </header>
+    {notice && <p className="cp-notice" role="status">{notice}</p>}
+    {!savedOnly && <form className="cp-feed-search" onSubmit={search}>
+      <label className="cp-feed-search-main"><Search size={18} /><input aria-label="Job title, keyword, skill or company" value={draft.q || ""} onChange={update("q")} placeholder="Job title, skill, or company" /></label>
+      <label className="cp-feed-search-place"><input aria-label="City or location" value={draft.location || ""} onChange={update("location")} placeholder="City or location" /></label>
+      <button className="button primary" type="submit">Search jobs</button>
+      <button className="button secondary cp-filter-trigger" type="button" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((open) => !open)}><SlidersHorizontal size={16} /> Filters</button>
+      {filtersOpen && <div className="cp-feed-advanced">
+        <label>Country<input aria-label="Country" value={draft.country || ""} onChange={update("country")} placeholder="e.g. Jordan" /></label>
+        <label>Workplace<select value={draft.workplace_type || ""} onChange={update("workplace_type")}><option value="">Any workplace</option><option value="remote">Remote</option><option value="hybrid">Hybrid</option><option value="on-site">On-site</option></select></label>
+        <label>Date posted<select value={draft.date_posted || ""} onChange={update("date_posted")}><option value="">Any date</option><option value="24h">Past 24 hours</option><option value="7d">Past 7 days</option><option value="30d">Past 30 days</option></select></label>
+        <label>Experience level<input value={draft.experience_level || ""} onChange={update("experience_level")} placeholder="e.g. Senior" /></label>
+        <label>Employment type<select value={draft.employment_type || ""} onChange={update("employment_type")}><option value="">Any type</option><option value="full-time">Full-time</option><option value="part-time">Part-time</option><option value="contract">Contract</option><option value="internship">Internship</option></select></label>
+        <button className="cp-text-button" type="button" onClick={() => { setDraft(initialFilters); setCriteria(initialFilters); setPage(1); }}>Clear filters</button>
+      </div>}
+    </form>}
+    <div className={`cp-unified-grid ${savedOnly ? "cp-saved-grid" : ""}`}>
+      <section className="cp-feed-list" aria-label={savedOnly ? "Saved jobs" : "Job opportunities"}>
+        <div className="cp-feed-list-head"><div><h2>{savedOnly ? "Saved opportunities" : criteria.q ? `Results for “${criteria.q}”` : "Jobs for you"}</h2><p>{savedOnly ? `${saved.length} saved` : feed?.context_sources?.length ? `Prioritized using ${feed.context_sources.join(" + ")}; all careers remain visible.` : "Browse opportunities across professions."}</p></div></div>
+        {!savedOnly && feed?.message && <p className="cp-small-note">{feed.message}</p>}
+        {!savedOnly && feed?.source_failures?.length > 0 && <p className="cp-notice">Some sources are unavailable: {feed.source_failures.join(", ")}. Showing available results.</p>}
+        {!savedOnly && loading && !feed && <div className="cp-loading" role="status"><RefreshCw className="spin" size={20} /> Loading real jobs…</div>}
+        {!savedOnly && error && <div className="cp-empty"><h2>Jobs are temporarily unavailable</h2><p>{error.code === "ECONNABORTED" ? "Job sources took too long to respond. Try again to check for newly cached results." : apiErrorMessage(error)}</p><button className="button secondary" onClick={() => setRetry((x) => x + 1)}>Try again</button></div>}
+        {jobs.map((job) => <JobCard key={jobKey(job)} job={job} selected={selected && jobKey(selected) === jobKey(job)} saved={!!savedFor(job)} busy={busy} onView={() => setSelected(job)} onSave={() => act(job, "save")} onApply={() => act(job, "apply")} />)}
+        {!loading && !error && !jobs.length && <div className="cp-empty"><h2>{savedOnly ? "No saved jobs yet" : feed?.source_failures?.length ? "No results from available sources" : "No jobs matched these filters"}</h2><p>{savedOnly ? "Save a job from the feed to keep it here." : "Try another role, location, or broader filters."}</p></div>}
+        {hasMore && <div className="cp-load-more"><button className="button secondary" disabled={loading} onClick={() => { if (!savedOnly && !feed.has_next) { setPage(1); setExpanded(true); } else setPage((current) => current + 1); }}>{loading ? "Loading…" : "Load more jobs"}</button></div>}
       </section>
-      <form
-        className="cp-quick-search"
-        onSubmit={tab === "recommended" ? applyRecommendedFilters : search}
-      >
-        <label>
-          <Search size={18} />
-          <span>What</span>
-          <input
-            aria-label="Job title or keyword"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Nurse, Accountant, Teacher, Designer…"
-          />
-        </label>
-        <label>
-          <MapPin size={18} />
-          <span>Where</span>
-          <input
-            aria-label="Job location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="City, country, or Remote"
-          />
-        </label>
-        <button className="button primary" disabled={loading}>
-          {loading ? "Searching…" : "Search jobs"}
-        </button>
-      </form>
-      <div className="cp-toolbar">
-        <div className="cp-tabs">
-          <button
-            className={tab === "discover" ? "active" : ""}
-            onClick={() => changeTab("discover")}
-          >
-            <Search size={15} /> Discover
-          </button>
-          <button
-            className={tab === "recommended" ? "active" : ""}
-            onClick={() => changeTab("recommended")}
-          >
-            For you
-          </button>
-          <button
-            className={tab === "saved" ? "active" : ""}
-            onClick={() => changeTab("saved")}
-          >
-            <Bookmark size={15} /> Saved <span>{saved.length}</span>
-          </button>
-        </div>
-        <button
-          className="cp-filter-toggle"
-          onClick={() => setFiltersOpen((x) => !x)}
-          aria-expanded={filtersOpen}
-        >
-          <SlidersHorizontal size={16} /> Refine search
-        </button>
-      </div>
-      {filtersOpen && (
-        <form
-          className="cp-search-form"
-          onSubmit={tab === "recommended" ? applyRecommendedFilters : search}
-        >
-          {tab === "recommended" && (
-            <>
-              <select
-                aria-label="Suggested profession"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              >
-                <option value="">All suggested professions</option>
-                {suggestedRoles.map((role) => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
-              </select>
-              <select
-                aria-label="Preferred country or location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              >
-                <option value="">All countries and locations</option>
-                {suggestedLocations.map((place) => (
-                  <option key={place} value={place}>{place}</option>
-                ))}
-              </select>
-            </>
-          )}
-          {tab !== "recommended" && (
-            <select
-              aria-label="Job type"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            >
-              <option value="">All work types</option>
-              <option value="remote">Remote</option>
-              <option value="full-time">Full-time</option>
-              <option value="part-time">Part-time</option>
-              <option value="internship">Internship</option>
-            </select>
-          )}
-          <button className="button primary" disabled={loading}>
-            Apply filter
-          </button>
-          <button
-            type="button"
-            className="cp-text-button"
-            onClick={() => {
-              setQuery("");
-              setLocation("");
-              setFilter("");
-              firstLoad.current = true;
-              setTab("recommended");
-              setParams({ page: 1, page_size: 10, mode: "recommended" });
-            }}
-          >
-            Show personalized recommendations
-          </button>
-        </form>
-      )}
-      {notice && (
-        <p className="cp-notice" role="status">
-          {notice}
-        </p>
-      )}
-      {tab !== "saved" && feed?.message && (
-        <p className="cp-small-note">{feed.message}</p>
-      )}
-      {tab !== "saved" && loading ? (
-        <div className="cp-loading" role="status">
-          <RefreshCw className="spin" size={22} />
-          <h2>
-            {tab === "discover"
-              ? "Searching real job listings"
-              : "Finding opportunities for you"}
-          </h2>
-          <p>
-            {tab === "discover"
-              ? "Checking configured providers for your search…"
-              : "Checking real listings against your career profile…"}
-          </p>
-          <div className="cp-skeleton" />
-          <div className="cp-skeleton" />
-        </div>
-      ) : tab !== "saved" && error ? (
-        <div className="cp-empty">
-          <h2>We couldn’t load your opportunities</h2>
-          <p>{apiErrorMessage(error)}</p>
-          <button
-            className="button secondary"
-            onClick={() => setParams((x) => ({ ...x }))}
-          >
-            Try again
-          </button>
-        </div>
-      ) : (
-        <>
-          <div className="cp-results-heading">
-            <div>
-              <h2>
-                {tab === "saved"
-                  ? "Your saved opportunities"
-                  : tab === "discover"
-                    ? feed
-                      ? feed.search_query
-                        ? `Results for “${feed.search_query}”`
-                        : feed.search_location
-                          ? `Jobs in ${feed.search_location}`
-                          : "Latest opportunities"
-                      : "Discover any career"
-                    : "Recommended for you"}
-              </h2>
-              <p>
-                {tab === "saved"
-                  ? "Your shortlist, ready whenever you are."
-                  : tab === "discover"
-                    ? "Broad search without Career Profile filters."
-                    : "Recommendations are ordered using your saved career profile."}
-              </p>
-            </div>
-            <span>
-              {visible.length} opportunities · Page {page}
-            </span>
-          </div>
-          <div className={`cp-jobs-grid ${selected ? "has-selection" : ""}`}>
-            <section className="cp-job-list" aria-label="Job opportunities">
-              {visible.map((job) => (
-                <JobCard
-                  key={jobKey(job)}
-                  job={job}
-                  selected={selected && jobKey(selected) === jobKey(job)}
-                  saved={!!savedFor(job)}
-                  busy={!!busy}
-                  onView={() => setSelected(job)}
-                  onSave={() => act(job, "save")}
-                  onApply={() => act(job, "apply")}
-                  onSkip={
-                    tab !== "saved"
-                      ? () => {
-                          setSkipped((old) => new Set([...old, jobKey(job)]));
-                          if (selected && jobKey(selected) === jobKey(job))
-                            setSelected(null);
-                        }
-                      : undefined
-                  }
-                />
-              ))}
-              {!visible.length && (
-                <div className="cp-empty">
-                  <Bookmark size={28} />
-                  <h2>
-                    {tab === "saved"
-                      ? "Build your shortlist"
-                      : tab === "discover" && !feed
-                        ? "Search any occupation or industry"
-                        : "No opportunities yet"}
-                  </h2>
-                  <p>
-                    {tab === "saved"
-                      ? "Save a role from your recommendations to find it here later."
-                      : tab === "discover" && !feed
-                        ? "Try Nurse, Accountant, Teacher, Marketing Manager, or any role you choose."
-                        : "Try another role or location, or update your career profile and check again."}
-                  </p>
-                  {skipped.size > 0 && (
-                    <button
-                      className="button secondary"
-                      onClick={() => setSkipped(new Set())}
-                    >
-                      Restore skipped jobs
-                    </button>
-                  )}
-                </div>
-              )}
-            </section>
-            <JobDetails
-              job={selected}
-              saved={selected && !!savedFor(selected)}
-              busy={!!busy}
-              onSave={() => act(selected, "save")}
-              onApply={() => act(selected, "apply")}
-              onClose={() => setSelected(null)}
-            />
-          </div>
-          <nav className="cp-pagination" aria-label="Job pages">
-            <button disabled={page <= 1} onClick={() => move(page - 1)}>
-              <ChevronLeft size={16} /> Previous
-            </button>
-            <span>
-              {page} / {pages}
-            </span>
-            <button disabled={page >= pages} onClick={() => move(page + 1)}>
-              Next <ChevronRight size={16} />
-            </button>
-          </nav>
-        </>
-      )}
-    </main>
-  );
+      <JobDetails job={selected} saved={selected && !!savedFor(selected)} busy={busy} onSave={() => act(selected, "save")} onApply={() => act(selected, "apply")} onClose={() => setSelected(null)} />
+    </div>
+  </main>;
 }

@@ -71,7 +71,8 @@ export default function Sidebar() {
           aria-label="CareerPilot AI"
           onClick={close}
         >
-          <img src="/careerpilot-logo.png" alt="CareerPilot AI" />
+          <span className="rail-logo-image"><img src="/careerpilot-logo.png" alt="" /></span>
+          <span className="rail-tooltip">CareerPilot home</span>
         </NavLink>
         <button
           className="icon-button rail-close mobile-only"

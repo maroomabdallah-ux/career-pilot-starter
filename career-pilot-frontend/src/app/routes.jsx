@@ -46,6 +46,7 @@ export default function AppRoutes() {
             <Route path="resume/templates" element={<ResumeTemplatesPage />} />
             <Route path="resume/:resumeId/edit" element={<ResumePage />} />
             <Route path="jobs" element={<JobsPage />} />
+            <Route path="jobs/saved" element={<JobsPage savedOnly />} />
             <Route path="applications" element={<ApplicationsPage />} />
             <Route
               path="applications/:applicationId"

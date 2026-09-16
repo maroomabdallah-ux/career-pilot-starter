@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -146,17 +147,15 @@ async def test_location_does_not_treat_worldwide_as_a_local_match():
     assert {item.external_id for item in result.jobs} == {"amman"}
 
 
-def test_default_discovery_has_multiple_real_sources_without_paid_keys(monkeypatch):
-    monkeypatch.setattr("app.services.job_search.settings.SERPAPI_API_KEY", None)
-    monkeypatch.setattr("app.services.job_search.settings.ADZUNA_APP_ID", None)
-    monkeypatch.setattr("app.services.job_search.settings.ADZUNA_APP_KEY", None)
-    monkeypatch.setattr("app.services.job_search.settings.JOOBLE_API_KEY", None)
-
+def test_default_discovery_uses_only_google_jobs(monkeypatch):
+    monkeypatch.setattr("app.services.job_search.settings.SERPAPI_API_KEY", "configured-key")
     names = [source.name for source in JobSearchService._configured_sources()]
+    assert names == ["Google Jobs"]
 
-    assert {"Arbeitnow", "Remotive"}.issubset(names)
-    assert not {"Greenhouse", "Lever"}.intersection(names)
-    assert len(names) >= 2
+
+def test_default_discovery_requires_serpapi_key(monkeypatch):
+    monkeypatch.setattr("app.services.job_search.settings.SERPAPI_API_KEY", None)
+    assert JobSearchService._configured_sources() == []
 
 
 @pytest.mark.asyncio
@@ -198,6 +197,52 @@ async def test_short_cache_avoids_repeating_identical_source_call():
     criteria = JobSearchCriteria(query="Python", workplace_type="remote")
     await service.search(criteria)
     await service.search(criteria)
+    assert calls == 1
+
+
+@pytest.mark.asyncio
+async def test_concurrent_identical_searches_share_one_provider_request():
+    source = Source("DirectATS", [job()])
+    calls = 0
+
+    async def counted(_criteria):
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.01)
+        return source.rows
+
+    source.search = counted
+    service = JobSearchService([source])
+    results = await asyncio.gather(*(service.search(JobSearchCriteria(query="Python")) for _ in range(3)))
+    assert calls == 1
+    assert all(result.result_count == 1 for result in results)
+
+
+@pytest.mark.asyncio
+async def test_client_cancellation_does_not_cancel_catalog_refresh():
+    source = Source("DirectATS", [job()])
+    started = asyncio.Event()
+    release = asyncio.Event()
+    calls = 0
+
+    async def delayed(_criteria):
+        nonlocal calls
+        calls += 1
+        started.set()
+        await release.wait()
+        return source.rows
+
+    source.search = delayed
+    service = JobSearchService([source])
+    criteria = JobSearchCriteria(query="Python")
+    client_request = asyncio.create_task(service.search(criteria))
+    await started.wait()
+    client_request.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await client_request
+    release.set()
+    result = await service.search(criteria)
+    assert result.result_count == 1
     assert calls == 1
 
 

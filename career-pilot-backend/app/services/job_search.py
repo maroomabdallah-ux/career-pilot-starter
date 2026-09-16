@@ -9,12 +9,8 @@ from html import unescape
 
 from app.core.config import settings
 from app.integrations.job_sources import (
-    AdzunaJobSource,
-    ArbeitnowJobSource,
     JobProvider,
     JobProviderResult,
-    JoobleJobSource,
-    RemotiveJobSource,
     SerpApiJobProvider,
 )
 from app.schemas.job import JobResult, JobSearchCriteria, JobSearchResponse
@@ -25,63 +21,87 @@ HTML = re.compile(r"<[^>]+>")
 
 
 class JobSearchService:
-    def __init__(self, sources: list[JobProvider] | None = None, cache_ttl: int = 180):
+    def __init__(self, sources: list[JobProvider] | None = None, cache_ttl: int = 3600):
         self.sources = sources if sources is not None else self._configured_sources()
         self.cache_ttl = cache_ttl
         self._cache: dict[str, tuple[float, JobSearchResponse]] = {}
+        self._inflight: dict[str, asyncio.Task] = {}
         self._details: dict[tuple[str, str], JobResult] = {}
 
     @staticmethod
     def _configured_sources() -> list[JobProvider]:
-        # These are general job boards.  Company ATS feeds remain available as
-        # adapters, but are intentionally not a default Discover source: the
-        # old catalog was a small, technology-company-only sample.
-        sources: list[JobProvider] = [ArbeitnowJobSource(), RemotiveJobSource()]
         if settings.SERPAPI_API_KEY:
-            sources.append(SerpApiJobProvider(settings.SERPAPI_API_KEY))
-        else:
-            logger.info("Skipping SerpApi: SERPAPI_API_KEY not configured")
-        if settings.ADZUNA_APP_ID and settings.ADZUNA_APP_KEY:
-            sources.append(
-                AdzunaJobSource(
-                    settings.ADZUNA_APP_ID,
-                    settings.ADZUNA_APP_KEY,
-                    settings.ADZUNA_COUNTRY,
-                )
-            )
-        else:
-            logger.info("Skipping Adzuna: ADZUNA_APP_ID/ADZUNA_APP_KEY not configured")
-        if settings.JOOBLE_API_KEY:
-            sources.append(JoobleJobSource(settings.JOOBLE_API_KEY))
-        else:
-            logger.info("Skipping Jooble: JOOBLE_API_KEY not configured")
-        return sources
+            return [SerpApiJobProvider(settings.SERPAPI_API_KEY)]
+        logger.warning("Google Jobs unavailable: SERPAPI_API_KEY not configured")
+        return []
 
-    async def search(self, criteria: JobSearchCriteria) -> JobSearchResponse:
-        key = criteria.model_dump_json()
+    async def search(
+        self, criteria: JobSearchCriteria, supplementary_queries: list[str] | None = None
+    ) -> JobSearchResponse:
+        queries = tuple(dict.fromkeys(
+            query.strip() for query in (supplementary_queries or []) if query.strip()
+        ))[:3] if not criteria.query else ()
+        key = criteria.model_dump_json() + "|" + "|".join(queries)
         cached = self._cache.get(key)
         if cached and time.monotonic() - cached[0] < self.cache_ttl:
             return cached[1].model_copy(deep=True)
+        if cached:
+            if key not in self._inflight:
+                self._inflight[key] = asyncio.create_task(self._refresh(criteria, key, queries))
+                self._inflight[key].add_done_callback(lambda task, k=key: self._finish_refresh(k, task))
+            response = cached[1].model_copy(deep=True)
+            response.message = "Showing cached jobs while sources refresh."
+            return response
+        if key not in self._inflight:
+            self._inflight[key] = asyncio.create_task(self._refresh(criteria, key, queries))
+            self._inflight[key].add_done_callback(lambda task, k=key: self._finish_refresh(k, task))
+        return (await asyncio.shield(self._inflight[key])).model_copy(deep=True)
+
+    def _finish_refresh(self, key: str, task: asyncio.Task) -> None:
+        self._inflight.pop(key, None)
+        if not task.cancelled() and task.exception():
+            logger.warning("Job catalog refresh failed: error_type=%s error=%s", type(task.exception()).__name__, task.exception())
+
+    async def _refresh(
+        self, criteria: JobSearchCriteria, key: str, supplementary_queries: tuple[str, ...]
+    ) -> JobSearchResponse:
+        requests = [(source, criteria) for source in self.sources]
+        # Google Jobs currently gives one ten-result page for a broad search,
+        # while its advertised next-page token returns no results. Seed a small
+        # cross-profession catalog, then add verified profile roles and deduplicate.
+        browse_queries = ("Accountant", "Nurse", "Marketing") + supplementary_queries
+        if not criteria.query and not criteria.page_token:
+            requests.extend(
+                (source, criteria.model_copy(update={"query": term}))
+                for source in self.sources if isinstance(source, SerpApiJobProvider)
+                for term in dict.fromkeys(browse_queries)
+            )
         outcomes = await asyncio.gather(
-            *(source.search(criteria) for source in self.sources), return_exceptions=True
+            *(source.search(request_criteria) for source, request_criteria in requests),
+            return_exceptions=True,
         )
         jobs, failures = [], []
         next_page_token = None
         authority = {source.name: source.authority for source in self.sources}
-        for source, outcome in zip(self.sources, outcomes, strict=True):
+        for index, ((source, request_criteria), outcome) in enumerate(zip(requests, outcomes, strict=True)):
             if isinstance(outcome, Exception):
                 logger.warning(
-                    "Job source failed: source=%s error_type=%s",
+                    "Job source failed: source=%s query=%r location=%r error_type=%s http_status=%s error=%s",
                     source.name,
+                    request_criteria.query,
+                    request_criteria.location,
                     type(outcome).__name__,
+                    getattr(getattr(outcome, "response", None), "status_code", None),
+                    _safe_error(outcome),
                 )
-                failures.append(source.name)
+                if index < len(self.sources):
+                    failures.append(source.name)
             elif isinstance(outcome, JobProviderResult):
                 jobs.extend(outcome.jobs)
                 next_page_token = outcome.next_page_token or next_page_token
             else:
                 jobs.extend(outcome)
-        if self.sources and len(failures) == len(self.sources):
+        if self.sources and len(failures) == len(self.sources) and not jobs:
             raise RuntimeError("All configured job providers are unavailable")
         for job in jobs:
             job.posted_at = _utc(job.posted_at)
@@ -149,6 +169,8 @@ class JobSearchService:
                 continue
             if criteria.location and not _location_matches(criteria.location, job.location):
                 continue
+            if criteria.country and not _location_matches(criteria.country, " ".join(filter(None, (job.country, job.location)))):
+                continue
             if criteria.workplace_type and job.workplace_type != criteria.workplace_type:
                 continue
             if (
@@ -198,6 +220,11 @@ class JobSearchService:
 
 def _plain(value):
     return unescape(HTML.sub(" ", value or ""))
+
+
+def _safe_error(error: Exception) -> str:
+    message = str(error)
+    return re.sub(r"https?://[^\s'\"]+", "[provider URL]", message)
 
 
 def _tokens(value):

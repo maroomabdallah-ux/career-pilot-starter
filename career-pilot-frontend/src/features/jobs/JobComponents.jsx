@@ -22,6 +22,9 @@ export const dateLabel = (value) => {
     "day",
   );
 };
+const availabilityLabel = (job) => ["closed", "expired"].includes(job.normalized_status)
+  ? "Unavailable per source"
+  : job.normalized_status === "active" ? "Active per source" : "Availability unverified";
 
 export function JobLogo({ job }) {
   const [failed, setFailed] = useState(null);
@@ -96,6 +99,7 @@ export function JobCard({
         </div>
       </div>
       <JobMeta job={job} />
+      <p className="cp-source-line">{job.source} · {availabilityLabel(job)}{job.match_score != null ? ` · ${job.match_score}% profile match` : ""}</p>
       {job.salary && <p className="cp-salary">{job.salary}</p>}
       {!!job.matched_skills?.length && (
         <div className="cp-skill-chips">
@@ -187,6 +191,7 @@ export function JobDetails({ job, saved, busy, onSave, onApply, onClose }) {
       <p className="cp-company-name">{job.company}</p>
       <h2>{job.title}</h2>
       <JobMeta job={job} />
+      <p className="cp-source-line">{job.source} · {availabilityLabel(job)}{job.match_score != null ? ` · ${job.match_score}% profile match` : ""}</p>
       {job.salary && <p className="cp-salary">{job.salary}</p>}
       <div className="cp-detail-cta">
         <button
@@ -215,9 +220,11 @@ export function JobDetails({ job, saved, busy, onSave, onApply, onClose }) {
             "This source has not provided a description."}
         </p>
       </section>
+      {!!job.requirements?.length && <section className="cp-description"><h3>Requirements</h3>{job.requirements.map((item, index) => <p key={index}>{plainText(item)}</p>)}</section>}
+      {!!job.fit_reasons?.length && <section className="cp-description"><h3>Why it may fit</h3>{job.fit_reasons.map((reason, index) => <p key={index}>{reason}</p>)}</section>}
       <p className="cp-small-note">
         Listing via {job.via || job.source}. Details are supplied by the job
-        source.
+        source. <a href={job.source_url} target="_blank" rel="noopener noreferrer">View original listing <ArrowUpRight size={12} /></a>
       </p>
     </aside>
   );

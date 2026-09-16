@@ -18,6 +18,7 @@ from app.schemas.job import (
 )
 from app.services.job_links import validate_job_link
 from app.services.job_search import JobSearchService
+from app.services.job_recommendations import expand_search_roles, load_career_context, rank_jobs
 from app.services.jobs import SavedJobService
 
 router = APIRouter()
@@ -44,12 +45,33 @@ async def paginated_search_jobs(
     page_size: int = 10,
     workplace_type: str | None = None,
     employment_type: str | None = None,
-    mode: Literal["discover", "recommended"] = "recommended",
+    country: str | None = None,
+    date_posted: Literal["24h", "7d", "30d"] | None = None,
+    experience_level: str | None = None,
+    expand: bool = False,
+    mode: Literal["feed", "discover", "recommended"] = "feed",
 ):
-    if page < 1 or page_size != 10:
-        raise HTTPException(422, "page must be at least 1 and page_size must be 10")
+    if page < 1 or not 1 <= page_size <= 50:
+        raise HTTPException(422, "page must be at least 1 and page_size must be between 1 and 50")
     try:
-        if mode == "discover":
+        if mode == "feed":
+            context = await load_career_context(session, user.id)
+            feed_location = location or country or (context.location if not q.strip() else None)
+            criteria = JobSearchCriteria(
+                query=q.strip(), location=feed_location or None, country=country or None,
+                workplace_type=workplace_type, employment_type=employment_type,
+                date_posted=date_posted, experience_level=experience_level, limit=50,
+            )
+            result = await direct_job_search.search(
+                criteria,
+                supplementary_queries=(
+                    expand_search_roles(context, limit=1)
+                    + (["Teacher", "Sales"] if expand else [])
+                ) if not q.strip() else None,
+            )
+            result.jobs = rank_jobs(result.jobs, context)
+            context_sources = context.sources
+        elif mode == "discover":
             criteria = JobSearchCriteria(
                 query=q.strip(),
                 location=location or None,
@@ -114,7 +136,7 @@ async def paginated_search_jobs(
         has_previous=page > 1,
         source_failures=result.source_failures,
         message=result.message,
-        total_pages=max(1, (len(result.jobs) + 9) // 10),
+        total_pages=max(1, (len(result.jobs) + page_size - 1) // page_size),
         context_sources=context_sources,
         search_query=criteria.query,
         search_location=criteria.location or "",
